@@ -1,0 +1,376 @@
+
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>J2ME LLM 离线配置包</title>
+  <style>
+    :root { color-scheme: dark; --bg:#08111f; --card:#101d31; --soft:#172943; --line:#29415f; --text:#edf5ff; --muted:#9db0c8; --accent:#69d5ff; --good:#7fe3b1; --warn:#ffcc72; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif; background:radial-gradient(circle at top,#173255 0,#08111f 45%); color:var(--text); }
+    main { width:min(940px,100%); margin:auto; padding:28px 16px 56px; }
+    h1 { margin:0; font-size:clamp(28px,6vw,48px); letter-spacing:-.03em; }
+    .lead { color:var(--muted); line-height:1.7; margin:8px 0 22px; }
+    .notice { border:1px solid #85652d; background:#2d2516; color:#ffe6ae; border-radius:14px; padding:14px 16px; line-height:1.6; }
+    .toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:end; margin:18px 0; padding:14px; background:#0d192a; border:1px solid var(--line); border-radius:16px; }
+    label { display:grid; gap:6px; color:var(--muted); font-size:13px; }
+    input,select,textarea,button { font:inherit; }
+    input,select,textarea { width:100%; min-height:42px; border:1px solid var(--line); border-radius:10px; background:#091525; color:var(--text); padding:9px 11px; outline:none; }
+    input:focus,select:focus,textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px #69d5ff22; }
+    input:disabled { opacity:.58; }
+    textarea { min-height:78px; resize:vertical; }
+    button,.button { min-height:42px; border:0; border-radius:10px; padding:9px 14px; cursor:pointer; color:#05111e; background:var(--accent); font-weight:700; text-align:center; }
+    button.secondary,.button.secondary { color:var(--text); background:var(--soft); border:1px solid var(--line); }
+    #fileInput { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+    #cards { display:grid; gap:14px; }
+    .card { background:linear-gradient(145deg,#12223a,#0d192b); border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 16px 40px #0004; }
+    .card-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:14px; }
+    .card h2 { margin:0; font-size:20px; }
+    .pill { color:#07141f; background:var(--good); border-radius:999px; padding:4px 9px; font-size:12px; font-weight:800; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .wide { grid-column:1/-1; }
+    .check { display:flex; align-items:center; gap:9px; color:var(--text); min-height:42px; }
+    .check input { width:20px; min-height:20px; accent-color:var(--accent); }
+    details { grid-column:1/-1; border-top:1px solid var(--line); padding-top:10px; }
+    summary { cursor:pointer; color:var(--accent); }
+    .advanced { margin-top:12px; }
+    #status { min-height:24px; margin:14px 2px; color:var(--good); line-height:1.5; }
+    footer { margin-top:24px; color:var(--muted); line-height:1.7; font-size:13px; }
+    code { color:#cdeeff; }
+    @media (max-width:680px) { .toolbar,.grid { grid-template-columns:1fr; } .toolbar button,.toolbar .button { width:100%; } .wide { grid-column:auto; } details { grid-column:auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>J2ME LLM 配置包</h1>
+  <p class="lead">完全离线运行。把密钥在安卓手机上填好，生成 <code>.j2cfg</code>，再通过蓝牙发送给 Java 手机导入。</p>
+  <div class="notice"><strong>安全提醒：</strong><code>.j2cfg</code> 会以明文保存 API 密钥，CRC 只能发现传输损坏，不能加密。请只在可信设备上操作，蓝牙传输并成功导入后立即删除两台手机上的文件；更推荐使用限额、可撤销的网关令牌。</div>
+
+  <div class="toolbar">
+    <label>启动后使用的档案<select id="activeProfile"></select></label>
+    <label class="button secondary" for="fileInput">载入备份检查</label>
+    <input id="fileInput" type="file" accept=".j2cfg,application/json">
+    <button id="download" type="button">生成 .j2cfg</button>
+  </div>
+
+  <div id="cards"></div>
+  <div id="status" role="status" aria-live="polite">页面未连接网络，可以开始填写。</div>
+  <footer>文件格式：<code>j2me-llm-config v2</code>。内部配置 JSON 使用 UTF-8 和 Base64 封装，并以 CRC-32 校验。导入备份会先验证格式、版本、大小和 CRC，再显示到表单中；网页不会上传或保存你的内容。</footer>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var FORMAT = 'j2me-llm-config';
+  var VERSION = 2;
+  var MAX_FILE = 32768;
+  var MAX_PAYLOAD = 24576;
+  var MAX_PROFILES = 8;
+  var LIMITS = {
+    id:32, preset:32, name:64, endpoint:512, modelsEndpoint:512,
+    apiKey:2048, model:128, systemPrompt:4096, reasoningEffort:32
+  };
+  var profileDefs = [
+    { id:'openai', preset:'openai', name:'OpenAI', endpoint:'https://api.openai.com/v1/chat/completions', modelsEndpoint:'https://api.openai.com/v1/models', apiKey:'', model:'', systemPrompt:'', stream:true, historyMessages:8, thinkingMode:0, thinkingProtocol:1, reasoningEffort:'low', multimodal:false, endpointOverridden:false, enabled:true },
+    { id:'deepseek', preset:'deepseek', name:'DeepSeek', endpoint:'https://api.deepseek.com/chat/completions', modelsEndpoint:'https://api.deepseek.com/models', apiKey:'', model:'deepseek-v4-flash', systemPrompt:'', stream:true, historyMessages:8, thinkingMode:0, thinkingProtocol:2, reasoningEffort:'high', multimodal:false, endpointOverridden:false, enabled:true },
+    { id:'kimi', preset:'kimi', name:'Kimi', endpoint:'https://api.moonshot.cn/v1/chat/completions', modelsEndpoint:'https://api.moonshot.cn/v1/models', apiKey:'', model:'kimi-k3', systemPrompt:'', stream:true, historyMessages:8, thinkingMode:0, thinkingProtocol:3, reasoningEffort:'low', multimodal:false, endpointOverridden:false, enabled:true },
+    { id:'custom', preset:'custom', name:'自定义', endpoint:'', modelsEndpoint:'', apiKey:'', model:'', systemPrompt:'', stream:true, historyMessages:8, thinkingMode:0, thinkingProtocol:0, reasoningEffort:'', multimodal:false, endpointOverridden:true, enabled:true }
+  ];
+  var activeId = 'openai';
+  var cards = document.getElementById('cards');
+  var activeSelect = document.getElementById('activeProfile');
+  var status = document.getElementById('status');
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function inputField(labelText, profile, key, type, wide) {
+    var label = el('label', wide ? 'wide' : '');
+    label.appendChild(document.createTextNode(labelText));
+    var input = document.createElement(type === 'textarea' ? 'textarea' : 'input');
+    if (type !== 'textarea') input.type = type || 'text';
+    input.value = profile[key] === undefined ? '' : profile[key];
+    if (LIMITS[key]) input.maxLength = LIMITS[key];
+    if (key === 'historyMessages') { input.min = '2'; input.max = '24'; input.step = '1'; }
+    input.addEventListener('input', function () { profile[key] = input.type === 'number' ? numberValue(input.value, 8) : input.value; });
+    label.appendChild(input);
+    return { label:label, input:input };
+  }
+
+  function selectField(labelText, profile, key, choices) {
+    var label = el('label');
+    label.appendChild(document.createTextNode(labelText));
+    var select = document.createElement('select');
+    var i;
+    for (i = 0; i < choices.length; i++) {
+      var option = document.createElement('option');
+      option.value = choices[i][0]; option.textContent = choices[i][1];
+      select.appendChild(option);
+    }
+    select.value = String(profile[key]);
+    select.addEventListener('change', function () { profile[key] = numberValue(select.value, 0); });
+    label.appendChild(select);
+    return label;
+  }
+
+  function checkField(labelText, profile, key, callback) {
+    var label = el('label', 'check');
+    var input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!profile[key];
+    input.addEventListener('change', function () { profile[key] = input.checked; if (callback) callback(); });
+    label.appendChild(input); label.appendChild(document.createTextNode(labelText));
+    return label;
+  }
+
+  function render() {
+    cards.textContent = '';
+    var i;
+    for (i = 0; i < profileDefs.length; i++) renderCard(profileDefs[i]);
+    renderActiveOptions();
+  }
+
+  function renderCard(profile) {
+    var card = el('section', 'card');
+    var head = el('div', 'card-head');
+    var title = el('h2', '', profile.name || profile.id);
+    var badge = el('span', 'pill', profile.preset === 'custom' ? '自定义端点' : '官方预设');
+    head.appendChild(title); head.appendChild(badge); card.appendChild(head);
+    var grid = el('div', 'grid');
+    grid.appendChild(checkField('包含此档案', profile, 'enabled', renderActiveOptions));
+    grid.appendChild(checkField('启用流式回复', profile, 'stream'));
+    var nameField = inputField('档案名称', profile, 'name', 'text');
+    nameField.input.addEventListener('input', function () { title.textContent = profile.name || profile.id; renderActiveOptions(); });
+    grid.appendChild(nameField.label);
+    grid.appendChild(inputField('模型（也可在手机上按需获取）', profile, 'model', 'text').label);
+    grid.appendChild(inputField('API 密钥', profile, 'apiKey', 'password', true).label);
+    grid.appendChild(inputField('系统提示词（可留空）', profile, 'systemPrompt', 'textarea', true).label);
+    grid.appendChild(selectField('思考模式', profile, 'thinkingMode', [['0','自动'],['1','开启'],['2','关闭']]));
+    grid.appendChild(inputField('思考强度（如 low / high）', profile, 'reasoningEffort', 'text').label);
+    grid.appendChild(inputField('携带历史消息数（2–24）', profile, 'historyMessages', 'number').label);
+    grid.appendChild(checkField('启用多模态（默认关闭）', profile, 'multimodal'));
+
+    var details = document.createElement('details');
+    var summary = document.createElement('summary'); summary.textContent = '高级端点与协议'; details.appendChild(summary);
+    var advanced = el('div', 'grid advanced');
+    var endpoint = inputField('聊天端点', profile, 'endpoint', 'text', true);
+    var models = inputField('模型列表端点', profile, 'modelsEndpoint', 'text', true);
+    function updateEndpointLock() {
+      var locked = profile.preset !== 'custom' && !profile.endpointOverridden;
+      endpoint.input.disabled = locked; models.input.disabled = locked;
+    }
+    if (profile.preset === 'custom') {
+      profile.endpointOverridden = true;
+      advanced.appendChild(el('div', 'hint', '自定义档案始终使用这里填写的端点和协议。'));
+      advanced.appendChild(selectField('思考参数协议', profile, 'thinkingProtocol', [['0','不发送'],['1','OpenAI reasoning_effort'],['2','thinking.enabled / disabled'],['3','Kimi 常开思考']]));
+    } else {
+      advanced.appendChild(checkField('覆盖官方端点（例如使用 HTTPS 网关）', profile, 'endpointOverridden', updateEndpointLock));
+      advanced.appendChild(el('div', 'hint', '官方档案的思考协议由模型预设决定，离线包不会覆盖。'));
+    }
+    advanced.appendChild(endpoint.label); advanced.appendChild(models.label);
+    details.appendChild(advanced); grid.appendChild(details); card.appendChild(grid); cards.appendChild(card);
+    updateEndpointLock();
+  }
+
+  function renderActiveOptions() {
+    var selected = activeId || activeSelect.value;
+    activeSelect.textContent = '';
+    var first = '';
+    var i;
+    for (i = 0; i < profileDefs.length; i++) {
+      var profile = profileDefs[i];
+      if (!profile.enabled) continue;
+      var option = document.createElement('option'); option.value = profile.id; option.textContent = profile.name || profile.id;
+      activeSelect.appendChild(option); if (!first) first = profile.id;
+    }
+    if (hasEnabled(selected)) activeSelect.value = selected; else activeSelect.value = first;
+    activeId = activeSelect.value;
+  }
+
+  activeSelect.addEventListener('change', function () { activeId = activeSelect.value; });
+
+  function hasEnabled(id) {
+    var i; for (i = 0; i < profileDefs.length; i++) if (profileDefs[i].id === id && profileDefs[i].enabled) return true;
+    return false;
+  }
+
+  function packageObject() {
+    var profiles = [];
+    var i;
+    for (i = 0; i < profileDefs.length; i++) {
+      if (!profileDefs[i].enabled) continue;
+      var p = profileDefs[i];
+      validateProfile(p, '档案 ' + (p.name || p.id));
+      profiles.push({ id:p.id, preset:p.preset, name:p.name, endpoint:p.endpoint, modelsEndpoint:p.modelsEndpoint, apiKey:p.apiKey, model:p.model, systemPrompt:p.systemPrompt, stream:!!p.stream, historyMessages:numberValue(p.historyMessages,8), thinkingMode:numberValue(p.thinkingMode,0), thinkingProtocol:numberValue(p.thinkingProtocol,0), reasoningEffort:p.reasoningEffort, multimodal:!!p.multimodal, endpointOverridden:!!p.endpointOverridden });
+    }
+    if (!profiles.length) throw new Error('至少保留一个档案。');
+    if (profiles.length > MAX_PROFILES) throw new Error('配置包最多允许 8 个档案。');
+    if (!hasEnabled(activeId)) activeId = profiles[0].id;
+    validateText('活动档案标识', activeId, LIMITS.id, true);
+    return { activeProfile:activeId, profiles:profiles };
+  }
+
+  document.getElementById('download').addEventListener('click', function () {
+    try {
+      var payloadText = JSON.stringify(packageObject());
+      var payload = utf8Encode(payloadText);
+      if (payload.length > MAX_PAYLOAD) throw new Error('配置内容超过 24 KB，请缩短系统提示词。');
+      var envelope = { format:FORMAT, version:VERSION, encoding:'base64', payload:base64Encode(payload), crc32:hex32(crc32(payload)) };
+      var bytes = utf8Encode(JSON.stringify(envelope, null, 2));
+      if (bytes.length > MAX_FILE) throw new Error('配置包超过 32 KB。');
+      var blob = new Blob([bytes], {type:'application/json'});
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(blob); link.download = 'J2ME-LLM-config-v2.j2cfg';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+      show('已生成配置包（' + bytes.length + ' 字节）。通过蓝牙发送后，请在导入成功时删除文件。', false);
+    } catch (error) { show(error.message || String(error), true); }
+  });
+
+  document.getElementById('fileInput').addEventListener('change', function (event) {
+    var file = event.target.files && event.target.files[0]; if (!file) return;
+    if (file.size > MAX_FILE) { show('配置包超过 32 KB。', true); return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      try { loadBytes(new Uint8Array(reader.result)); }
+      catch (error) { show(error.message || String(error), true); }
+    };
+    reader.onerror = function () { show('无法读取所选文件。', true); };
+    reader.readAsArrayBuffer(file);
+  });
+
+  function loadBytes(bytes) {
+    if (!bytes.length || bytes.length > MAX_FILE) throw new Error('配置包大小无效。');
+    var envelope = JSON.parse(utf8Decode(bytes));
+    if (envelope.format !== FORMAT) throw new Error('不是 J2ME LLM 配置包。');
+    if (envelope.version !== VERSION) throw new Error('仅支持配置包 v2。');
+    if (envelope.encoding !== 'base64' || typeof envelope.payload !== 'string') throw new Error('配置包编码无效。');
+    var payload = base64Decode(envelope.payload);
+    if (payload.length > MAX_PAYLOAD) throw new Error('配置内容超过 24 KB。');
+    if (hex32(crc32(payload)) !== String(envelope.crc32).toUpperCase()) throw new Error('CRC 校验失败：文件可能已损坏或被修改。');
+    var decoded = JSON.parse(utf8Decode(payload));
+    validateDecodedPackage(decoded);
+    var loaded = 0;
+    var i; for (i = 0; i < profileDefs.length; i++) profileDefs[i].enabled = false;
+    for (i = 0; i < decoded.profiles.length; i++) {
+      var source = decoded.profiles[i]; var target = findProfile(source.id, source.preset);
+      if (!target) continue;
+      copyFields(source, target); target.enabled = true; loaded++;
+    }
+    if (!loaded) throw new Error('配置包中没有网页可编辑的预设档案。');
+    activeId = typeof decoded.activeProfile === 'string' ? decoded.activeProfile : '';
+    render(); show('备份验证通过，已载入 ' + loaded + ' 个档案。密钥只存在于当前页面内存中。', false);
+  }
+
+  function findProfile(id, preset) {
+    var i; for (i = 0; i < profileDefs.length; i++) if (profileDefs[i].id === id) return profileDefs[i];
+    for (i = 0; i < profileDefs.length; i++) if (profileDefs[i].preset === preset) return profileDefs[i];
+    return null;
+  }
+
+  function copyFields(source, target) {
+    var fields = ['name','endpoint','modelsEndpoint','apiKey','model','systemPrompt','reasoningEffort'];
+    var i; for (i = 0; i < fields.length; i++) if (typeof source[fields[i]] === 'string') target[fields[i]] = source[fields[i]];
+    fields = ['stream','multimodal','endpointOverridden'];
+    for (i = 0; i < fields.length; i++) if (typeof source[fields[i]] === 'boolean') target[fields[i]] = source[fields[i]];
+    fields = ['historyMessages','thinkingMode','thinkingProtocol'];
+    for (i = 0; i < fields.length; i++) if (typeof source[fields[i]] === 'number') target[fields[i]] = source[fields[i]];
+  }
+
+  function utf8Encode(text) {
+    var out = []; var i;
+    for (i = 0; i < text.length; i++) {
+      var ch = text.charCodeAt(i);
+      if (ch < 128) out.push(ch);
+      else if (ch < 2048) { out.push(192 | (ch >> 6), 128 | (ch & 63)); }
+      else if (ch >= 55296 && ch <= 56319 && i + 1 < text.length) {
+        var low = text.charCodeAt(i + 1);
+        if (low >= 56320 && low <= 57343) { var cp = 65536 + ((ch - 55296) << 10) + low - 56320; out.push(240 | (cp >> 18),128 | ((cp >> 12)&63),128 | ((cp >> 6)&63),128 | (cp&63)); i++; }
+        else out.push(239,191,189);
+      } else if (ch >= 56320 && ch <= 57343) out.push(239,191,189);
+      else out.push(224 | (ch >> 12),128 | ((ch >> 6)&63),128 | (ch&63));
+    }
+    return new Uint8Array(out);
+  }
+
+  function utf8Decode(bytes) {
+    var out = ''; var i = 0;
+    while (i < bytes.length) {
+      var a = bytes[i++];
+      if (a < 128) out += String.fromCharCode(a);
+      else if ((a & 224) === 192 && i < bytes.length) out += String.fromCharCode(((a & 31) << 6) | (bytes[i++] & 63));
+      else if ((a & 240) === 224 && i + 1 < bytes.length) out += String.fromCharCode(((a & 15) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63));
+      else if ((a & 248) === 240 && i + 2 < bytes.length) { var cp = ((a&7)<<18)|((bytes[i++]&63)<<12)|((bytes[i++]&63)<<6)|(bytes[i++]&63); cp -= 65536; out += String.fromCharCode(55296 | (cp >> 10),56320 | (cp & 1023)); }
+      else out += '\ufffd';
+    }
+    return out;
+  }
+
+  function base64Encode(bytes) { var binary=''; var i; for (i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]); return btoa(binary); }
+  function base64Decode(text) { var binary=atob(text); var bytes=new Uint8Array(binary.length); var i; for(i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; }
+  function crc32(bytes) { var crc=0xffffffff; var i,j; for(i=0;i<bytes.length;i++){ crc ^= bytes[i]; for(j=0;j<8;j++) crc=(crc&1)?((crc>>>1)^0xedb88320):(crc>>>1); } return (crc^0xffffffff)>>>0; }
+  function hex32(value) { var text=(value>>>0).toString(16).toUpperCase(); while(text.length<8) text='0'+text; return text; }
+  function validateDecodedPackage(config) {
+    if (!config || !Array.isArray(config.profiles) || !config.profiles.length) throw new Error('配置包没有档案。');
+    if (config.profiles.length > MAX_PROFILES) throw new Error('配置包最多允许 8 个档案。');
+    var ids = {}; var i;
+    for (i = 0; i < config.profiles.length; i++) {
+      var profile = config.profiles[i];
+      if (!profile || typeof profile !== 'object') throw new Error('档案必须是对象。');
+      if (profile.preset === undefined) profile.preset = 'custom';
+      validateProfile(profile, '档案 #' + (i + 1));
+      if (ids[profile.id]) throw new Error('档案标识重复：' + profile.id);
+      ids[profile.id] = true;
+    }
+    var active = config.activeProfile === undefined ? '' : config.activeProfile;
+    validateText('活动档案标识', active, LIMITS.id, false);
+    if (active && !ids[active]) throw new Error('活动档案不存在。');
+  }
+
+  function validateProfile(profile, label) {
+    validateText(label + '的标识', profile.id, LIMITS.id, true);
+    validateText(label + '的预设标识', profile.preset, LIMITS.preset, true);
+    validateText(label + '的名称', optionalText(profile.name), LIMITS.name, false);
+    validateText(label + '的聊天端点', optionalText(profile.endpoint), LIMITS.endpoint, false);
+    validateText(label + '的模型端点', optionalText(profile.modelsEndpoint), LIMITS.modelsEndpoint, false);
+    validateText(label + '的 API 密钥', optionalText(profile.apiKey), LIMITS.apiKey, false);
+    validateText(label + '的模型名称', optionalText(profile.model), LIMITS.model, false);
+    validateText(label + '的系统提示词', optionalText(profile.systemPrompt), LIMITS.systemPrompt, false);
+    validateText(label + '的思考强度', optionalText(profile.reasoningEffort), LIMITS.reasoningEffort, false);
+    validateInteger(label + '的历史消息数', profile.historyMessages, 8, 2, 24);
+    validateInteger(label + '的思考模式', profile.thinkingMode, 0, 0, 2);
+    validateInteger(label + '的思考协议', profile.thinkingProtocol, 0, 0, 3);
+  }
+
+  function validateInteger(label, value, fallback, minimum, maximum) {
+    if (value === undefined || value === null) value = fallback;
+    if (typeof value !== 'number' || !isFinite(value) || Math.floor(value) !== value
+        || value < minimum || value > maximum) {
+      throw new Error(label + '必须是 ' + minimum + '–' + maximum + ' 之间的整数。');
+    }
+  }
+
+  function validateText(label, value, maximum, required) {
+    if (typeof value !== 'string') throw new Error(label + '必须是文本。');
+    if (required && !value.length) throw new Error(label + '不能为空。');
+    if (value.length > maximum) throw new Error(label + '超过 ' + maximum + ' 个字符。');
+  }
+
+  function optionalText(value) { return value === undefined || value === null ? '' : value; }
+  function numberValue(value,fallback) { var n=parseInt(value,10); return isFinite(n)?n:fallback; }
+  function show(message,isError) { status.textContent=message; status.style.color=isError?'#ff8e8e':'var(--good)'; }
+
+  render();
+}());
+</script>
+<noscript>此离线工具需要浏览器启用 JavaScript，所有处理仍只在本机完成。</noscript>
+</body>
+</html>
+
+
+
+

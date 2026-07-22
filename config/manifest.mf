@@ -1,0 +1,10 @@
+Manifest-Version: 1.0
+MIDlet-Name: J2ME LLM
+MIDlet-Version: 0.2.0
+MIDlet-Vendor: Chihoko
+MIDlet-1: J2ME LLM,,com.chihoko.j2mellm.LlmMidlet
+MicroEdition-Configuration: CLDC-1.1
+MicroEdition-Profile: MIDP-2.0
+MIDlet-Permissions: javax.microedition.io.Connector.http, javax.microedition.io.Connector.https
+MIDlet-Permissions-Opt: javax.microedition.io.Connector.file.read, javax.microedition.io.Connector.file.write
+

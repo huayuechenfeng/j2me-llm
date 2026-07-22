@@ -1,0 +1,52 @@
+package com.chihoko.j2mellm.net;
+
+import com.chihoko.j2mellm.util.Utf8;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
+final class ByteLineReader {
+    private static final int MAX_LINE_BYTES = 65536;
+
+    private final InputStream input;
+    private final byte[] buffer = new byte[512];
+    private int position;
+    private int length;
+
+    ByteLineReader(InputStream input) {
+        this.input = input;
+    }
+
+    String readLine() throws IOException {
+        ByteArrayOutputStream line = new ByteArrayOutputStream(128);
+        boolean readAny = false;
+        while (true) {
+            int value = readByte();
+            if (value < 0) {
+                if (!readAny) return null;
+                return Utf8.decode(line.toByteArray());
+            }
+            readAny = true;
+            if (value == '\n') {
+                return Utf8.decode(line.toByteArray());
+            }
+            if (value != '\r') {
+                if (line.size() >= MAX_LINE_BYTES) {
+                    throw new IOException("服务器返回的单行数据过长");
+                }
+                line.write(value);
+            }
+        }
+    }
+
+    private int readByte() throws IOException {
+        if (position >= length) {
+            length = input.read(buffer);
+            position = 0;
+            if (length < 0) return -1;
+        }
+        return buffer[position++] & 0xff;
+    }
+}
+

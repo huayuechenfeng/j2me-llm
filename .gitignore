@@ -1,0 +1,11 @@
+.tools/
+build/
+dist/
+.agents/
+.codex/
+.microemulator/
+gateway/.env
+*.j2cfg
+*.log
+.DS_Store
+Thumbs.db
