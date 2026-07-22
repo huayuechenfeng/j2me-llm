@@ -3,7 +3,9 @@
 
 # Changelog
 
-## 0.2.0
+## 0.2.0 — 首个公开发布版本
+
+v0.2.0 是 J2ME LLM 的第一个公开发布版本，采用 AI 辅助的 vibe coding 协作开发。
 
 - 新增 OpenAI、DeepSeek、Kimi、自定义四个独立档案及分档案聊天历史。
 - 新增 `J2MELLM_PROFILES` 版本化 RMS、主副记录恢复和 v0.1 `J2MELLM_CFG` / `J2MELLM_CHAT` 自动迁移；旧库保留。
@@ -20,7 +22,9 @@
 - MicroEmulator 启动脚本自动使用临时 ASCII 盘符，兼容位于中文路径下的工程。
 - 新增完整用户、架构、开发、更新恢复和配置包中文文档。
 
-## 0.1.0
+## 0.1.0 — 未公开原型
+
+此版本仅用于开发、构建验证和索爱 W995 实机测试，从未公开发布。
 
 - 首个可构建、可安装版本。
 - OpenAI Chat Completions 兼容请求与 SSE 流式响应。
@@ -28,6 +32,7 @@
 - 可选 JSR-75 图片选择、Base64 vision 输入和兼容图片预览。
 - Node.js HTTPS/TLS 兼容网关。
 - MicroEmulator、本地构建脚本与自测。
+
 
 
 

@@ -2,7 +2,11 @@
 
 [简体中文](README.md) | **English**
 
-J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. Version 0.2.0 builds on the v0.1 release tested on a Sony Ericsson W995 and adds multiple provider profiles, official presets, on-demand model discovery, independent reasoning controls, memory-conscious streaming, optional multimodal input, and offline configuration packages that can be transferred over Bluetooth.
+J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. Version 0.2.0 builds on the v0.1 prototype tested on a Sony Ericsson W995 and adds multiple provider profiles, official presets, on-demand model discovery, independent reasoning controls, memory-conscious streaming, optional multimodal input, and offline configuration packages that can be transferred over Bluetooth.
+
+**Download v0.2.0:** [JAR installer](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jar) · [JAD descriptor](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jad) · [Release notes](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.2.0)
+
+> **Development note:** v0.2.0 is the first public release of J2ME LLM; v0.1.0 was an unpublished development and W995 device-testing prototype. Chihoko defined the product direction and performed real-device validation, while design, implementation, testing, and documentation were completed through AI-assisted vibe coding.
 
 ## Highlights
 
@@ -141,3 +145,4 @@ Plain HTTP on a LAN is not end-to-end encrypted: the device token, prompts, answ
 - An emulator cannot reproduce W995 TLS, fonts, JSR-75 behavior, heap limits, or image decoders. Real-device regression testing remains required for each release.
 
 Contributions and device compatibility reports are welcome.
+
