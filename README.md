@@ -4,7 +4,7 @@
 
 J2ME LLM 是一个面向 CLDC 1.1 / MIDP 2.0 手机和 Java ME 模拟器的轻量 OpenAI Chat Completions 兼容客户端。v0.2.0 在索爱 W995 可运行的 v0.1 基础上加入多档案、官方预设、按需模型目录、真正独立的思考开关、低内存请求写出，以及可通过蓝牙传输的离线配置包。
 
-**下载 v0.2.0：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jad) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.2.0)
+**下载 v0.2.0：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jad) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.2.0) · [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM-Gateway-v0.2.0-windows-x64.zip)
 
 > **开发说明：** v0.2.0 是 J2ME LLM 的首个公开发布版本；v0.1.0 只是未公开的开发与 W995 实机验证版本。本项目由 Chihoko 提出产品方向并完成实机验证，通过 AI 辅助的 vibe coding 协作完成设计、实现、测试与文档。
 
@@ -129,8 +129,3 @@ W995 等旧设备可能因 TLS 版本或根证书无法直连现代 HTTPS。项�
 - Key 保存在 RMS 中，没有硬件安全区；安全强度取决于设备、文件权限和网关策略。
 - `.j2cfg` 不备份聊天；手机卸载应用后 RMS 通常无法恢复。
 - 模拟器不能代表 W995 的 TLS、字体、JSR-75、堆大小和图片解码器，发布前仍需实机回归。
-
-
-
-
-

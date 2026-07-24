@@ -19,6 +19,7 @@ v0.2.0 是 J2ME LLM 的第一个公开发布版本，采用 AI 辅助的 vibe co
 - 图片解码前检查格式头与像素数，发送/返回预览限制为 65,536 像素；文件浏览器限制为 256 项。
 - 模型档案与聊天 RMS 均采用恢复副本；空 v0.2 库仍可继续旧数据迁移；补充 11 组桌面自测及真实 MicroEmulator v0.1 迁移/主记录损坏恢复夹具。
 - 网关升级为 v0.2，可代理 `POST /v1/chat/completions` 和 `GET /v1/models`。
+- 新增无需源码或系统 Node.js 的 Windows x64 独立网关 ZIP；BAT 使用包内运行时，并生成方便 J2ME 输入的 12 位纯数字设备令牌。
 - MicroEmulator 启动脚本自动使用临时 ASCII 盘符，兼容位于中文路径下的工程。
 - 新增完整用户、架构、开发、更新恢复和配置包中文文档。
 
@@ -32,7 +33,3 @@ v0.2.0 是 J2ME LLM 的第一个公开发布版本，采用 AI 辅助的 vibe co
 - 可选 JSR-75 图片选择、Base64 vision 输入和兼容图片预览。
 - Node.js HTTPS/TLS 兼容网关。
 - MicroEmulator、本地构建脚本与自测。
-
-
-
-

@@ -5,6 +5,8 @@ dist/
 .codex/
 .microemulator/
 gateway/.env
+/一键网关/gateway.conf
+/一键网关/runtime/
 *.j2cfg
 *.log
 .DS_Store

@@ -4,6 +4,10 @@
 
 v0.2 同时代理聊天和模型目录，因此 MIDlet 的“获取模型”功能在索爱 W995 等旧设备上也可以通过网关工作。
 
+## 独立一键包
+
+普通用户无需安装 Node.js，也无需下载项目源码。下载并解压 [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM-Gateway-v0.2.0-windows-x64.zip)，编辑 `gateway.conf` 后双击“启动网关.bat”即可。压缩包内置经过官方校验的 Node.js v24.14.0 运行时、中文 README 和许可证；`DEVICE_TOKEN=AUTO` 会生成并保存便于九宫格输入的 12 位纯数字令牌。整个解压目录可移动到任意位置，但不能只复制 BAT。
+
 ## 暴露的接口
 
 | 方法与路径 | 是否需要设备令牌 | 用途 |
@@ -111,4 +115,3 @@ node .\gateway\self-test.js
 返回 401 Invalid device token：手机里填写的必须是 DEVICE_TOKEN。真实 UPSTREAM_API_KEY 只应存在于网关环境变量中。
 
 返回 502 Upstream request failed：检查上游 URL、DNS、服务商网络可达性和真实密钥。可临时设置 LOG_ERRORS=1 查看脱敏错误，排查后再关闭。
-
