@@ -2,9 +2,9 @@
 
 
 
-# J2ME LLM v0.2 架构与兼容性
+# J2ME LLM v0.3 架构与兼容性
 
-本文面向维护者，说明 v0.2 如何在 CLDC 1.1 / MIDP 2.0 的限制下组织多档案、网络流、RMS、离线配置和可选图片。目标不是把桌面端架构缩小后照搬，而是把高峰内存、TLS 差异、断电写入和厂商协议差异当作一等约束。
+本文面向维护者，说明 v0.3 如何在 CLDC 1.1 / MIDP 2.0 的限制下组织双语与触屏 UI、多档案、网络流、RMS、离线配置和可选图片。目标不是把桌面端架构缩小后照搬，而是把高峰内存、TLS 差异、断电写入和厂商协议差异当作一等约束。
 
 ## 1. 运行边界
 
@@ -19,7 +19,8 @@
 | 层 | 主要类 | 职责 |
 | --- | --- | --- |
 | 应用控制 | `LlmMidlet` | 生命周期、当前档案与会话、界面导航、请求协调、保存与内存回收 |
-| UI | `ChatCanvas`、`SettingsForm`、档案/模型/配置文件界面、`ImagePicker`、`ImageDimensions` | 气泡绘制、命令、档案编辑、按需模型选择、可选文件访问 |
+| UI | `ChatCanvas`、`SettingsForm`、`LanguageScreen`、档案/模型/配置文件界面、`ImagePicker`、`ImageDimensions` | 气泡绘制、键盘/触屏命令、档案编辑、语言选择、按需模型选择、可选文件访问 |
+| i18n | `I18n`、`TextCatalog`、`TextZh`、`TextEn`、`LanguageStore` | 文本 ID、轻量中英文目录、系统区域选择和独立 RMS 语言偏好 |
 | 模型 | `ProviderProfile`、`ProviderPresets`、`ProfileState`、`ChatMessage`、`MessageMedia` | 四档案状态、思考策略元数据、消息与延迟分配的媒体数据 |
 | 聊天网络 | `OpenAiChatClient`、`ChatRequestWriter`、`JsonStreamWriter`、`ByteLineReader`、`ThinkingFilter` | 两遍计数/流式写请求、SSE 或 JSON 响应、正文/思考/兼容图片分离 |
 | 模型目录 | `ModelCatalogClient`、`ModelCatalogParser` | 用户显式触发 GET `/models`，增量提取 `data[].id` |
@@ -27,7 +28,7 @@
 | 离线配置 | `ProvisioningCodec`、`ProvisioningFileService`、`ProvisioningPackage` | `.j2cfg` 编解码、边界验证、JSR-75 文件读写 |
 | TLS 兼容 | `gateway/server.js` | 可信局域网 HTTP 到现代上游 HTTPS 的有限反向代理 |
 
-旧的 `ProviderConfig`、`ConfigStore` 和 `ConversationStore` 保留为 v0.1 格式定义/迁移来源；v0.2 正常路径使用 profile 版本。
+旧的 `ProviderConfig`、`ConfigStore` 和 `ConversationStore` 保留为 v0.1 格式定义/迁移来源；v0.3 正常路径继续使用 v0.2 引入的 profile 与 v2 RMS 格式。
 
 ## 3. 核心数据流
 
@@ -35,10 +36,13 @@
 
 ```text
 MIDlet start
+  -> LanguageStore.load() + I18n.init()
+      -> 用户偏好存在：使用中文/English/跟随系统
+      -> 偏好不存在：按 microedition.locale 选择
   -> ProfileStore.load()
-      -> v0.2 主记录有效：加载
+      -> v2 主记录有效：加载
       -> 主记录坏、备份有效：加载备份并修复主记录
-      -> v0.2 库不存在：读取 v0.1 J2MELLM_CFG，迁入 custom
+      -> v2 库不存在：读取 v0.1 J2MELLM_CFG，迁入 custom
   -> 选择 activeProfileId
   -> ProfileConversationStore(active).load()
       -> 必要时把 v0.1 J2MELLM_CHAT 迁入 custom
@@ -46,6 +50,8 @@ MIDlet start
 ```
 
 档案切换前保存当前会话，切换后换用对应 `J2CHAT_<id>`。聊天 Vector 不跨档案共享。
+
+语言偏好单独保存在 `J2MELLM_UI_PREFS`，不会触发 profile、会话或 `.j2cfg` 迁移。切换语言后，`LlmMidlet` 重建依赖静态 LCDUI 文本的命令和界面，并把当前档案与会话重新绑定到 `ChatCanvas`。
 
 ### 3.2 一次流式聊天请求
 
@@ -214,7 +220,7 @@ file <= 32 KiB
 
 ## 12. 协议兼容性矩阵
 
-| 能力 | 标准/常见形态 | v0.2 行为 |
+| 能力 | 标准/常见形态 | v0.3 行为 |
 | --- | --- | --- |
 | 聊天请求 | `POST /chat/completions` | 支持文字、SSE、非流式 JSON |
 | 模型列表 | `GET /models`, `data[].id` | 显式请求、增量解析和缓存 |
@@ -222,14 +228,14 @@ file <= 32 KiB
 | 思考响应 | `reasoning_content`/`reasoning`/`analysis`/`<think>` | 分离到折叠区域 |
 | 图片输入 | `content` parts + `image_url` | 多模态开启时发 data URL，detail low |
 | 图片输出 | 厂商私有 content part、images、b64_json、URL | 多模态开启时尽力识别；非标准保证 |
-| 工具调用 | `tools`/`tool_calls` | v0.2 不实现 |
-| Responses API | `/responses` | v0.2 不作为聊天主协议 |
+| 工具调用 | `tools`/`tool_calls` | v0.3 不实现 |
+| Responses API | `/responses` | v0.3 不作为聊天主协议 |
 
 上游“OpenAI 兼容”常只覆盖字段子集。自定义端点应先用 AUTO + 纯文字 + 非敏感短提示验证，再逐项开启流式、思考和图片。
 
 ## 13. 威胁模型与非目标
 
-v0.2 防护重点是意外损坏、峰值内存和误暴露，不包含完整安全沙箱：
+v0.3 防护重点是意外损坏、峰值内存和误暴露，不包含完整安全沙箱：
 
 - RMS/`.j2cfg` 不加密；拿到设备或文件的人可能读取 Key；
 - CRC 不提供数字签名；
@@ -251,8 +257,7 @@ v0.2 防护重点是意外损坏、峰值内存和误暴露，不包含完整安
 - [Kimi K2 Thinking 指南](https://platform.kimi.com/docs/guide/use-kimi-k2-thinking-model)
 - [Oracle Java ME RMS RecordStore](https://docs.oracle.com/javame/config/cldc/ref-impl/midp2.0/jsr118/javax/microedition/rms/RecordStore.html)
 
-协议链接与预设说明按 2026-07-22 核对。
-
+协议链接与预设说明按 2026-07-25 核对。
 
 
 

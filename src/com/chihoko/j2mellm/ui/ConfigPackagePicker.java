@@ -1,5 +1,8 @@
 package com.chihoko.j2mellm.ui;
 
+import com.chihoko.j2mellm.i18n.I18n;
+import com.chihoko.j2mellm.i18n.TextId;
+
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Vector;
@@ -16,8 +19,9 @@ import javax.microedition.lcdui.List;
 /** JSR-75 browser loaded by reflection only when the user chooses Import. */
 public final class ConfigPackagePicker implements ConfigPickerController, CommandListener {
     private static final int MAX_ENTRIES = 256;
-    private final Command backCommand = new Command("返回", Command.BACK, 2);
-    private final Command upCommand = new Command("上级", Command.BACK, 1);
+    private final Command backCommand = new Command(
+            I18n.text(TextId.BACK), Command.BACK, 2);
+    private final Command upCommand = new Command(I18n.text(TextId.UP), Command.BACK, 1);
     private Display display;
     private Displayable back;
     private ConfigPickListener listener;
@@ -50,18 +54,22 @@ public final class ConfigPackagePicker implements ConfigPickerController, Comman
     private void showRoots() {
         try {
             urls = new Vector();
-            list = new List("选择 .j2cfg", List.IMPLICIT);
+            list = new List(I18n.text(TextId.SELECT_CONFIG), List.IMPLICIT);
             Enumeration roots = FileSystemRegistry.listRoots();
             while (roots.hasMoreElements() && urls.size() < MAX_ENTRIES) {
                 String root = (String) roots.nextElement();
                 list.append(root, null);
                 urls.addElement("file:///" + root);
             }
-            if (roots.hasMoreElements()) list.setTitle("选择 .j2cfg · 前256项");
+            if (roots.hasMoreElements()) {
+                list.setTitle(I18n.text(TextId.SELECT_CONFIG)
+                        + I18n.text(TextId.FIRST_256_SUFFIX));
+            }
             currentUrl = null;
             finishList();
         } catch (Throwable failure) {
-            fail("无法读取文件系统：" + message(failure));
+            fail(I18n.text(TextId.READ_FILESYSTEM_FAILED_PREFIX)
+                    + I18n.error(message(failure)));
         }
     }
 
@@ -69,7 +77,9 @@ public final class ConfigPackagePicker implements ConfigPickerController, Comman
         FileConnection file = null;
         try {
             file = (FileConnection) Connector.open(url, Connector.READ);
-            if (!file.exists() || !file.isDirectory()) throw new IOException("目录不存在");
+            if (!file.exists() || !file.isDirectory()) {
+                throw new IOException(I18n.text(TextId.DIRECTORY_MISSING));
+            }
             urls = new Vector();
             list = new List(shortTitle(url), List.IMPLICIT);
             Enumeration entries = file.list();
@@ -85,11 +95,14 @@ public final class ConfigPackagePicker implements ConfigPickerController, Comman
                     urls.addElement(url + name);
                 }
             }
-            if (limited) list.setTitle(shortTitle(url) + " · 前256项");
+            if (limited) {
+                list.setTitle(shortTitle(url) + I18n.text(TextId.FIRST_256_SUFFIX));
+            }
             currentUrl = url;
             finishList();
         } catch (Throwable failure) {
-            fail("无法打开目录：" + message(failure));
+            fail(I18n.text(TextId.OPEN_DIRECTORY_FAILED_PREFIX)
+                    + I18n.error(message(failure)));
         } finally {
             close(file);
         }

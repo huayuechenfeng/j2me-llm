@@ -1,5 +1,7 @@
 package com.chihoko.j2mellm.ui;
 
+import com.chihoko.j2mellm.i18n.I18n;
+import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.util.Base64;
 import com.chihoko.j2mellm.util.ImageDimensions;
 
@@ -32,10 +34,10 @@ public final class ImageLoader implements Runnable {
             byte[] data = readSource();
             ImageDimensions dimensions = ImageDimensions.parse(data);
             if (dimensions == null) {
-                throw new IOException("无法安全识别图片尺寸，已跳过预览");
+                throw new IOException(I18n.text(TextId.IMAGE_DIMENSIONS_UNSAFE));
             }
             if (!dimensions.fitsPixelLimit(MAX_PREVIEW_PIXELS)) {
-                throw new IOException("图片像素超过 65536，已跳过预览");
+                throw new IOException(I18n.text(TextId.IMAGE_PIXELS_PREVIEW_SKIPPED));
             }
             ensureDecodeMemory(data.length, dimensions.pixelCountOrMaximum());
             Image image = Image.createImage(data, 0, data.length);
@@ -49,23 +51,25 @@ public final class ImageLoader implements Runnable {
     }
 
     private byte[] readSource() throws IOException {
-        if (source == null) throw new IOException("缺少图片地址");
+        if (source == null) throw new IOException(I18n.text(TextId.IMAGE_SOURCE_MISSING));
         if (source.startsWith("data:image/")) {
             int comma = source.indexOf(',');
             if (comma < 0 || source.substring(0, comma).indexOf(";base64") < 0) {
-                throw new IOException("不支持的图片 data URL");
+                throw new IOException(I18n.text(TextId.IMAGE_DATA_URL_UNSUPPORTED));
             }
             String encoded = source.substring(comma + 1);
             if (encoded.length() > ((MAX_DOWNLOAD_BYTES * 4) / 3) + 8) {
-                throw new IOException("返回图片超过 256 KB");
+                throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
             }
             byte[] decoded = Base64.decode(encoded);
-            if (decoded.length > MAX_DOWNLOAD_BYTES) throw new IOException("返回图片超过 256 KB");
+            if (decoded.length > MAX_DOWNLOAD_BYTES) {
+                throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
+            }
             return decoded;
         }
         String lower = source.toLowerCase();
         if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
-            throw new IOException("只支持 HTTP、HTTPS 或 data URL 图片");
+            throw new IOException(I18n.text(TextId.IMAGE_PROTOCOL_UNSUPPORTED));
         }
         HttpConnection connection = null;
         InputStream input = null;
@@ -75,9 +79,11 @@ public final class ImageLoader implements Runnable {
             connection.setRequestProperty("Accept", "image/png, image/jpeg, image/gif, image/webp");
             connection.setRequestProperty("Connection", "close");
             int status = connection.getResponseCode();
-            if (status < 200 || status >= 300) throw new IOException("图片 HTTP " + status);
+            if (status < 200 || status >= 300) throw new IOException("Image HTTP " + status);
             long declared = connection.getLength();
-            if (declared > MAX_DOWNLOAD_BYTES) throw new IOException("返回图片超过 256 KB");
+            if (declared > MAX_DOWNLOAD_BYTES) {
+                throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
+            }
             input = connection.openInputStream();
             ByteArrayOutputStream output = new ByteArrayOutputStream(
                     declared > 0 ? (int) declared : 4096);
@@ -86,7 +92,7 @@ public final class ImageLoader implements Runnable {
             while ((count = input.read(buffer)) >= 0) {
                 if (count == 0) continue;
                 if (output.size() + count > MAX_DOWNLOAD_BYTES) {
-                    throw new IOException("返回图片超过 256 KB");
+                    throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
                 }
                 output.write(buffer, 0, count);
             }
@@ -101,7 +107,7 @@ public final class ImageLoader implements Runnable {
         long free = Runtime.getRuntime().freeMemory();
         long reserve = (long) encodedBytes + ((long) pixels * 4L) + 65536L;
         if (free > 0 && free < reserve) {
-            throw new IOException("可用内存不足，已跳过图片预览");
+            throw new IOException(I18n.text(TextId.IMAGE_PREVIEW_LOW_MEMORY));
         }
     }
 }

@@ -2,11 +2,19 @@
 
 [简体中文](README.md) | **English**
 
-J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. Version 0.2.0 builds on the v0.1 prototype tested on a Sony Ericsson W995 and adds multiple provider profiles, official presets, on-demand model discovery, independent reasoning controls, memory-conscious streaming, optional multimodal input, and offline configuration packages that can be transferred over Bluetooth.
+J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. The current release is v0.3.0, adding a bilingual UI and full-screen touch toolbar to the profiles, model discovery, reasoning controls, memory-conscious networking, and offline configuration packages introduced in v0.2.0.
 
-**Download v0.2.0:** [JAR installer](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jar) · [JAD descriptor](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jad) · [Offline configuration generator HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM-Config-Generator-v0.2.0.html) · [Standalone Windows x64 gateway ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM-Gateway-v0.2.0-windows-x64.zip) · [Release notes](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.2.0)
+**Download v0.3.0:** [JAR installer](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jar) · [JAD descriptor](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jad) · [Offline configuration generator HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Config-Generator-v0.3.0.html) · [Standalone Windows x64 gateway ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Gateway-v0.3.0-windows-x64.zip) · [Release notes](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.3.0)
 
-> **Development note:** v0.2.0 is the first public release of J2ME LLM; v0.1.0 was an unpublished development and W995 device-testing prototype. Chihoko defined the product direction and performed real-device validation, while design, implementation, testing, and documentation were completed through AI-assisted vibe coding.
+> **Project note:** v0.3.0 is the current public release; v0.2.0 was the first public release of J2ME LLM, while v0.1.0 was an unpublished development and W995 device-testing prototype. Chihoko defined the product direction and performed real-device validation, while design, implementation, testing, and documentation were completed through AI-assisted vibe coding.
+
+## What's new in v0.3.0
+
+- Simplified Chinese, English, and system-default UI modes. Auto mode selects Chinese for `zh*` locales and English otherwise.
+- The language preference is stored separately in `J2MELLM_UI_PREFS` without changing profiles, configuration packages, or conversations.
+- Touch devices use a full-screen chat view with Compose/Stop, Image/Profiles, and More toolbar buttons.
+- More provides Profiles, Settings, Language, Reasoning, Clear, and Exit; touch scrolling, hit testing, resize reflow, and pixel-width ellipsis are supported.
+- Non-touch devices retain the existing commands and directional-key scrolling in the same universal JAR.
 
 ## Highlights
 
@@ -39,7 +47,7 @@ Place `J2ME-LLM.jar` and `J2ME-LLM.jad` in the same directory and install throug
 For a v0.1 upgrade:
 
 1. Do **not** uninstall the existing MIDlet. Uninstalling a Java ME suite usually removes its RMS data.
-2. Keep `MIDlet-Name: J2ME LLM` and `MIDlet-Vendor: Chihoko` unchanged, then install the v0.2.0 JAD as an update or replacement.
+2. Keep `MIDlet-Name: J2ME LLM` and `MIDlet-Vendor: Chihoko` unchanged, then install the v0.3.0 JAD as an update or replacement.
 3. On first launch, verify that the active profile is `Custom (legacy configuration)` and check the endpoint, key, model, and migrated conversation.
 4. Export a `.j2cfg` backup after the upgrade succeeds.
 
@@ -59,7 +67,7 @@ Build outputs:
 - `dist/J2ME-LLM.jar`
 - `dist/J2ME-LLM.jad`
 
-The release build runs 11 desktop self-tests, compiles with ECJ using Java 1.3 source and CLDC 1.1-compatible class files, and performs Java ME preverification with ProGuard. Do not use `-SkipTests` for release artifacts.
+The release build runs 12 desktop self-tests, compiles with ECJ using Java 1.3 source and CLDC 1.1-compatible class files, and performs Java ME preverification with ProGuard. Do not use `-SkipTests` for release artifacts.
 
 Start MicroEmulator with:
 

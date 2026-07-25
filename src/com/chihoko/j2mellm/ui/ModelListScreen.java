@@ -1,5 +1,7 @@
 package com.chihoko.j2mellm.ui;
 
+import com.chihoko.j2mellm.i18n.I18n;
+import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.model.ProviderProfile;
 
 import java.util.Vector;
@@ -10,14 +12,14 @@ import javax.microedition.lcdui.List;
 
 /** Displays only the explicitly fetched, memory-capped model cache. */
 public final class ModelListScreen extends List {
-    public final Command refreshCommand = new Command("联网获取", Command.SCREEN, 1);
-    public final Command backCommand = new Command("返回", Command.BACK, 2);
+    public final Command refreshCommand = new Command(I18n.text(TextId.FETCH_ONLINE), Command.SCREEN, 1);
+    public final Command backCommand = new Command(I18n.text(TextId.BACK), Command.BACK, 2);
 
     private ProviderProfile profile;
     private final Vector displayedModels = new Vector();
 
     public ModelListScreen(ProviderProfile providerProfile, CommandListener listener) {
-        super("选择模型", List.IMPLICIT);
+        super(I18n.text(TextId.SELECT_MODEL), List.IMPLICIT);
         profile = providerProfile;
         addCommand(refreshCommand);
         addCommand(backCommand);
@@ -39,7 +41,7 @@ public final class ModelListScreen extends List {
             if (model.equals(profile.model)) selected = displayedModels.size() - 1;
         }
         if (displayedModels.size() == 0) {
-            append("尚无缓存；选择“联网获取”后再挑选模型", null);
+            append(I18n.text(TextId.NO_MODEL_CACHE), null);
         } else if (selected >= 0) {
             setSelectedIndex(selected, true);
         }

@@ -117,7 +117,7 @@ async function main() {
     );
     for (const call of upstreamCalls) {
       assert.equal(call.authorization, 'Bearer upstream-secret');
-      assert.equal(call.userAgent, 'J2ME-LLM-Gateway/0.2.0');
+      assert.equal(call.userAgent, 'J2ME-LLM-Gateway/0.3.0');
     }
 
     assert.throws(
@@ -170,4 +170,3 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
-

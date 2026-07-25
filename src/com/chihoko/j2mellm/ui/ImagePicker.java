@@ -1,5 +1,7 @@
 package com.chihoko.j2mellm.ui;
 
+import com.chihoko.j2mellm.i18n.I18n;
+import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.model.ImageAttachment;
 import com.chihoko.j2mellm.util.ImageDimensions;
 
@@ -22,8 +24,9 @@ public final class ImagePicker implements ImagePickerController, CommandListener
     private static final int MAX_IMAGE_BYTES = 98304;
     private static final int MAX_PREVIEW_PIXELS = 65536;
     private static final int MAX_ENTRIES = 256;
-    private final Command backCommand = new Command("返回", Command.BACK, 2);
-    private final Command upCommand = new Command("上级", Command.BACK, 1);
+    private final Command backCommand = new Command(
+            I18n.text(TextId.BACK), Command.BACK, 2);
+    private final Command upCommand = new Command(I18n.text(TextId.UP), Command.BACK, 1);
     private Display display;
     private Displayable back;
     private ImagePickListener listener;
@@ -56,18 +59,22 @@ public final class ImagePicker implements ImagePickerController, CommandListener
     private void showRoots() {
         try {
             urls = new Vector();
-            list = new List("选择图片位置", List.IMPLICIT);
+            list = new List(I18n.text(TextId.SELECT_IMAGE_LOCATION), List.IMPLICIT);
             Enumeration roots = FileSystemRegistry.listRoots();
             while (roots.hasMoreElements() && urls.size() < MAX_ENTRIES) {
                 String root = (String) roots.nextElement();
                 list.append(root, null);
                 urls.addElement("file:///" + root);
             }
-            if (roots.hasMoreElements()) list.setTitle("选择图片位置 · 前256项");
+            if (roots.hasMoreElements()) {
+                list.setTitle(I18n.text(TextId.SELECT_IMAGE_LOCATION)
+                        + I18n.text(TextId.FIRST_256_SUFFIX));
+            }
             currentUrl = null;
             finishList();
         } catch (Throwable failure) {
-            fail("无法读取文件系统：" + message(failure));
+            fail(I18n.text(TextId.READ_FILESYSTEM_FAILED_PREFIX)
+                    + I18n.error(message(failure)));
         }
     }
 
@@ -75,7 +82,9 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         FileConnection file = null;
         try {
             file = (FileConnection) Connector.open(url, Connector.READ);
-            if (!file.exists() || !file.isDirectory()) throw new IOException("目录不存在");
+            if (!file.exists() || !file.isDirectory()) {
+                throw new IOException(I18n.text(TextId.DIRECTORY_MISSING));
+            }
             urls = new Vector();
             list = new List(shortTitle(url), List.IMPLICIT);
             Enumeration entries = file.list();
@@ -91,11 +100,14 @@ public final class ImagePicker implements ImagePickerController, CommandListener
                     urls.addElement(url + name);
                 }
             }
-            if (limited) list.setTitle(shortTitle(url) + " · 前256项");
+            if (limited) {
+                list.setTitle(shortTitle(url) + I18n.text(TextId.FIRST_256_SUFFIX));
+            }
             currentUrl = url;
             finishList();
         } catch (Throwable failure) {
-            fail("无法打开目录：" + message(failure));
+            fail(I18n.text(TextId.OPEN_DIRECTORY_FAILED_PREFIX)
+                    + I18n.error(message(failure)));
         } finally {
             close(file);
         }
@@ -130,16 +142,18 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         try {
             file = (FileConnection) Connector.open(url, Connector.READ);
             long size = file.fileSize();
-            if (size > MAX_IMAGE_BYTES) throw new IOException("图片超过 96 KB，请先压缩");
+            if (size > MAX_IMAGE_BYTES) {
+                throw new IOException(I18n.text(TextId.IMAGE_TOO_LARGE));
+            }
             ensureMemory(size);
             input = file.openInputStream();
             byte[] data = size > 0 ? readKnownSize(input, (int) size) : readUnknownSize(input);
             ImageDimensions dimensions = ImageDimensions.parse(data);
             if (dimensions == null) {
-                throw new IOException("无法识别图片尺寸，为防止内存溢出未载入");
+                throw new IOException(I18n.text(TextId.IMAGE_DIMENSIONS_UNKNOWN));
             }
             if (!dimensions.fitsPixelLimit(MAX_PREVIEW_PIXELS)) {
-                throw new IOException("图片像素超过 65536，请先缩小到约 256×256");
+                throw new IOException(I18n.text(TextId.IMAGE_PIXELS_TOO_LARGE));
             }
             ensurePreviewMemory(data.length, dimensions.pixelCountOrMaximum());
             String name = file.getName();
@@ -147,7 +161,8 @@ public final class ImagePicker implements ImagePickerController, CommandListener
             display.setCurrent(back);
             listener.onImagePicked(attachment);
         } catch (Throwable failure) {
-            fail("无法读取图片：" + message(failure));
+            fail(I18n.text(TextId.READ_IMAGE_FAILED_PREFIX)
+                    + I18n.error(message(failure)));
         } finally {
             if (input != null) try { input.close(); } catch (IOException ignored) { }
             close(file);
@@ -159,12 +174,12 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         try {
             data = new byte[size];
         } catch (OutOfMemoryError failure) {
-            throw new IOException("可用内存不足，请选择更小的图片");
+            throw new IOException(I18n.text(TextId.CHOOSE_SMALLER_IMAGE));
         }
         int offset = 0;
         while (offset < data.length) {
             int count = input.read(data, offset, data.length - offset);
-            if (count < 0) throw new IOException("图片读取不完整");
+            if (count < 0) throw new IOException(I18n.text(TextId.IMAGE_READ_INCOMPLETE));
             if (count > 0) offset += count;
         }
         return data;
@@ -177,7 +192,7 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         while ((count = input.read(buffer)) >= 0) {
             if (count == 0) continue;
             if (output.size() + count > MAX_IMAGE_BYTES) {
-                throw new IOException("图片超过 96 KB，请先压缩");
+                throw new IOException(I18n.text(TextId.IMAGE_TOO_LARGE));
             }
             output.write(buffer, 0, count);
         }
@@ -189,7 +204,7 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         long free = Runtime.getRuntime().freeMemory();
         long reserve = size * 3L + 65536L;
         if (free > 0 && free < reserve) {
-            throw new IOException("可用内存不足，请选择更小的图片");
+            throw new IOException(I18n.text(TextId.CHOOSE_SMALLER_IMAGE));
         }
     }
 
@@ -197,7 +212,7 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         long free = Runtime.getRuntime().freeMemory();
         long reserve = (long) encodedBytes + ((long) pixels * 4L) + 65536L;
         if (free > 0 && free < reserve) {
-            throw new IOException("可用内存不足，请选择更小的图片");
+            throw new IOException(I18n.text(TextId.CHOOSE_SMALLER_IMAGE));
         }
     }
 

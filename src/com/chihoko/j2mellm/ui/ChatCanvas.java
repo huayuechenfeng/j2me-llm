@@ -1,6 +1,8 @@
 
 package com.chihoko.j2mellm.ui;
 
+import com.chihoko.j2mellm.i18n.I18n;
+import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.model.ChatMessage;
 import com.chihoko.j2mellm.model.ProviderPresets;
 import com.chihoko.j2mellm.model.ProviderProfile;
@@ -15,14 +17,24 @@ import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.Image;
 
 public final class ChatCanvas extends Canvas {
-    public final Command composeCommand = new Command("输入", Command.OK, 1);
-    public final Command imageCommand = new Command("图片", Command.SCREEN, 2);
-    public final Command profilesCommand = new Command("档案", Command.SCREEN, 3);
-    public final Command settingsCommand = new Command("设置", Command.SCREEN, 4);
-    public final Command thinkingCommand = new Command("思维链", Command.SCREEN, 5);
-    public final Command clearCommand = new Command("清空", Command.SCREEN, 6);
-    public final Command stopCommand = new Command("停止", Command.STOP, 1);
-    public final Command exitCommand = new Command("退出", Command.EXIT, 9);
+    public final Command composeCommand = new Command(
+            I18n.text(TextId.COMPOSE), Command.OK, 1);
+    public final Command imageCommand = new Command(
+            I18n.text(TextId.IMAGE), Command.SCREEN, 2);
+    public final Command profilesCommand = new Command(
+            I18n.text(TextId.PROFILES), Command.SCREEN, 3);
+    public final Command settingsCommand = new Command(
+            I18n.text(TextId.SETTINGS), Command.SCREEN, 4);
+    public final Command languageCommand = new Command(
+            I18n.text(TextId.LANGUAGE), Command.SCREEN, 5);
+    public final Command thinkingCommand = new Command(
+            I18n.text(TextId.REASONING), Command.SCREEN, 6);
+    public final Command clearCommand = new Command(
+            I18n.text(TextId.CLEAR), Command.SCREEN, 7);
+    public final Command stopCommand = new Command(
+            I18n.text(TextId.STOP), Command.STOP, 1);
+    public final Command exitCommand = new Command(
+            I18n.text(TextId.EXIT), Command.EXIT, 9);
 
     private static final int COLOR_BACKGROUND = 0xf3f5fa;
     private static final int COLOR_HEADER = 0x4b3f8f;
@@ -32,10 +44,16 @@ public final class ChatCanvas extends Canvas {
     private static final int COLOR_MUTED = 0x73798c;
     private static final int COLOR_REASONING = 0xeeeafd;
     private static final int COLOR_ERROR = 0xb42318;
+    private static final int COLOR_TOOLBAR = 0x342d69;
+    private static final int COLOR_TOOLBAR_PRESSED = 0x6554c0;
     private static final int REPAINT_INTERVAL_MS = 100;
+    private static final int DRAG_THRESHOLD = 4;
+    private static final int MORE_ITEM_COUNT = 6;
 
     private Vector messages;
     private ProviderProfile profile;
+    private final CommandListener commandListener;
+    private final boolean touchEnabled;
     private final Vector layouts = new Vector();
     private int scroll;
     private int maximumScroll;
@@ -44,15 +62,24 @@ public final class ChatCanvas extends Canvas {
     private volatile boolean busy;
     private boolean repaintDirty;
     private boolean repaintWorkerRunning;
+    private boolean moreMenuOpen;
+    private int pointerStartX;
+    private int pointerStartY;
+    private int pointerStartScroll;
+    private boolean pointerCanScroll;
+    private boolean pointerDragging;
 
     public ChatCanvas(Vector initialMessages, ProviderProfile initialProfile,
             CommandListener listener) {
         messages = initialMessages;
         profile = initialProfile;
+        commandListener = listener;
+        touchEnabled = hasPointerEvents();
         showReasoning = initialProfile != null && initialProfile.reasoningExpanded;
-        setFullScreenMode(false);
+        setFullScreenMode(touchEnabled);
         addCommand(profilesCommand);
         addCommand(settingsCommand);
+        addCommand(languageCommand);
         addCommand(thinkingCommand);
         addCommand(clearCommand);
         addCommand(exitCommand);
@@ -66,6 +93,7 @@ public final class ChatCanvas extends Canvas {
         showReasoning = valueProfile != null && valueProfile.reasoningExpanded;
         scroll = 0;
         scrollToBottom = true;
+        moreMenuOpen = false;
         layouts.removeAllElements();
         refreshSendCommands();
         repaint();
@@ -74,6 +102,7 @@ public final class ChatCanvas extends Canvas {
     public void setProfile(ProviderProfile value) {
         profile = value;
         showReasoning = value != null && value.reasoningExpanded;
+        moreMenuOpen = false;
         layouts.removeAllElements();
         refreshSendCommands();
         repaint();
@@ -109,7 +138,20 @@ public final class ChatCanvas extends Canvas {
         layouts.removeAllElements();
     }
 
+    protected void sizeChanged(int width, int height) {
+        boolean wasAtBottom = scroll >= maximumScroll;
+        layouts.removeAllElements();
+        maximumScroll = 0;
+        if (wasAtBottom) scrollToBottom = true;
+        repaint();
+    }
+
     protected void keyPressed(int keyCode) {
+        if (moreMenuOpen) {
+            moreMenuOpen = false;
+            repaint();
+            return;
+        }
         int action = getGameAction(keyCode);
         int step = Font.getDefaultFont().getHeight() * 3;
         if (action == UP) {
@@ -125,6 +167,67 @@ public final class ChatCanvas extends Canvas {
         }
     }
 
+    protected void pointerPressed(int x, int y) {
+        if (!touchEnabled) return;
+        pointerStartX = x;
+        pointerStartY = y;
+        pointerStartScroll = scroll;
+        pointerDragging = false;
+        pointerCanScroll = !moreMenuOpen && y >= contentTop() && y < contentBottom();
+    }
+
+    protected void pointerDragged(int x, int y) {
+        if (!touchEnabled || !pointerCanScroll) return;
+        int distance = y - pointerStartY;
+        if (!pointerDragging && absolute(distance) < DRAG_THRESHOLD) return;
+        pointerDragging = true;
+        scroll = pointerStartScroll - distance;
+        clampScroll();
+        scrollToBottom = false;
+        repaint();
+    }
+
+    protected void pointerReleased(int x, int y) {
+        if (!touchEnabled) return;
+        if (pointerDragging) {
+            pointerDragging = false;
+            pointerCanScroll = false;
+            return;
+        }
+        pointerCanScroll = false;
+
+        if (moreMenuOpen) {
+            int row = moreMenuRowAt(x, y);
+            if (row >= 0 && row == moreMenuRowAt(pointerStartX, pointerStartY)) {
+                moreMenuOpen = false;
+                repaint();
+                fireCommand(moreCommand(row));
+                return;
+            }
+            if (toolbarButtonAt(x, y) == 2
+                    && toolbarButtonAt(pointerStartX, pointerStartY) == 2) {
+                moreMenuOpen = false;
+                repaint();
+                return;
+            }
+            moreMenuOpen = false;
+            repaint();
+            return;
+        }
+
+        int button = toolbarButtonAt(x, y);
+        if (button != toolbarButtonAt(pointerStartX, pointerStartY)) return;
+        if (button == 0) {
+            fireCommand(busy ? stopCommand : composeCommand);
+        } else if (button == 1) {
+            fireCommand(profile != null && profile.multimodal
+                    ? imageCommand : profilesCommand);
+        } else if (button == 2) {
+            moreMenuOpen = true;
+            repaint();
+        }
+    }
+
     protected void paint(Graphics graphics) {
         int width = getWidth();
         int height = getHeight();
@@ -132,7 +235,10 @@ public final class ChatCanvas extends Canvas {
         Font bold = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_SMALL);
         int headerHeight = bold.getHeight() + 14;
         int statusHeight = normal.getHeight() + 6;
-        int viewHeight = height - headerHeight - statusHeight;
+        int toolbarHeight = touchEnabled ? normal.getHeight() + 14 : 0;
+        int statusY = height - toolbarHeight - statusHeight;
+        int viewHeight = statusY - headerHeight;
+        if (viewHeight < 1) viewHeight = 1;
 
         graphics.setColor(COLOR_BACKGROUND);
         graphics.fillRect(0, 0, width, height);
@@ -154,7 +260,9 @@ public final class ChatCanvas extends Canvas {
             graphics.setFont(normal);
             graphics.setColor(COLOR_MUTED);
             String empty = profile != null && profile.multimodal
-                    ? "按“输入”或“图片”开始聊天" : "按“输入”开始聊天";
+                    ? I18n.text(TextId.EMPTY_CHAT_WITH_IMAGE)
+                    : I18n.text(TextId.EMPTY_CHAT);
+            empty = ellipsize(empty, normal, width - 16);
             graphics.drawString(empty, width / 2, headerHeight + viewHeight / 2,
                     Graphics.HCENTER | Graphics.BASELINE);
         } else {
@@ -170,11 +278,13 @@ public final class ChatCanvas extends Canvas {
 
         graphics.setClip(0, 0, width, height);
         graphics.setColor(0xe6e9f2);
-        graphics.fillRect(0, height - statusHeight, width, statusHeight);
+        graphics.fillRect(0, statusY, width, statusHeight);
         graphics.setFont(normal);
         graphics.setColor(COLOR_MUTED);
-        graphics.drawString(statusText(), 6, height - statusHeight + 3,
+        graphics.drawString(ellipsize(statusText(), normal, width - 12), 6, statusY + 3,
                 Graphics.TOP | Graphics.LEFT);
+        if (touchEnabled) drawTouchToolbar(graphics, normal, width, height, toolbarHeight);
+        if (moreMenuOpen) drawMoreMenu(graphics, normal, width, height, toolbarHeight);
     }
 
     private void drawHeader(Graphics graphics, int width, int height, Font font) {
@@ -182,23 +292,28 @@ public final class ChatCanvas extends Canvas {
         graphics.fillRect(0, 0, width, height);
         graphics.setFont(font);
         graphics.setColor(0xffffff);
-        String title = profile == null ? "J2ME LLM" : profile.displayName();
+        String title = profile == null ? "J2ME LLM" : I18n.profileName(profile);
         if (profile != null && profile.model != null && profile.model.length() > 0) {
             title += " · " + profile.model;
         }
-        if (title.length() > 30) title = title.substring(0, 29) + "…";
+        title = ellipsize(title, font, width - 34);
         graphics.drawString(title, 9, 7, Graphics.TOP | Graphics.LEFT);
         graphics.setColor(busy ? 0xffd166 : 0x72e0a8);
         graphics.fillArc(width - 17, 11, 7, 7, 0, 360);
     }
 
     private String statusText() {
-        if (busy) return "● 正在接收模型响应";
-        String mode = "自动";
+        if (busy) return I18n.text(TextId.RECEIVING_RESPONSE);
+        String mode = I18n.text(TextId.AUTO);
         if (profile != null && (profile.thinkingMode == ProviderProfile.THINKING_ON
-                || ProviderPresets.isKimiAlwaysThinking(profile))) mode = "开";
-        else if (profile != null && profile.thinkingMode == ProviderProfile.THINKING_OFF) mode = "关";
-        return "请求思考：" + mode + " · 思维链：" + (showReasoning ? "展开" : "折叠");
+                || ProviderPresets.isKimiAlwaysThinking(profile))) {
+            mode = I18n.text(TextId.ON);
+        } else if (profile != null && profile.thinkingMode == ProviderProfile.THINKING_OFF) {
+            mode = I18n.text(TextId.OFF);
+        }
+        return I18n.text(TextId.REQUEST_REASONING_PREFIX) + mode
+                + I18n.text(TextId.CHAIN_PREFIX)
+                + I18n.text(showReasoning ? TextId.EXPANDED : TextId.COLLAPSED);
     }
 
     private int measureMessages(Font normal, Font bold, int width) {
@@ -249,7 +364,8 @@ public final class ChatCanvas extends Canvas {
         int cursorY = y + 5;
         graphics.setFont(bold);
         graphics.setColor(user ? 0xffffff : COLOR_MUTED);
-        graphics.drawString(user ? "你" : "AI", textX, cursorY, Graphics.TOP | Graphics.LEFT);
+        graphics.drawString(user ? I18n.text(TextId.YOU) : "AI",
+                textX, cursorY, Graphics.TOP | Graphics.LEFT);
         cursorY += bold.getHeight();
 
         if (layout.hasReasoning) {
@@ -259,7 +375,10 @@ public final class ChatCanvas extends Canvas {
             graphics.fillRoundRect(textX, cursorY + 2, textWidth, reasonHeight, 8, 8);
             graphics.setFont(normal);
             graphics.setColor(user ? 0xffffff : COLOR_HEADER);
-            graphics.drawString(layout.expanded ? "思考" : "思考 · 已折叠", textX + 4,
+            graphics.drawString(layout.expanded
+                            ? I18n.text(TextId.THINKING)
+                            : I18n.text(TextId.THINKING_COLLAPSED),
+                    textX + 4,
                     cursorY + 3, Graphics.TOP | Graphics.LEFT);
             cursorY += normal.getHeight() + 5;
             if (layout.expanded) {
@@ -279,8 +398,9 @@ public final class ChatCanvas extends Canvas {
         if (message.hasMedia()) {
             graphics.setColor(user ? 0xded8ff : COLOR_MUTED);
             String label = message.getImageName().length() > 0
-                    ? "▣ " + message.getImageName() : "▣ 模型图片";
-            if (label.length() > 30) label = label.substring(0, 29) + "…";
+                    ? "▣ " + message.getImageName()
+                    : "▣ " + I18n.text(TextId.MODEL_IMAGE);
+            label = ellipsize(label, normal, textWidth);
             graphics.drawString(label, textX, cursorY, Graphics.TOP | Graphics.LEFT);
             cursorY += normal.getHeight() + 3;
             Image image = message.getImagePreview();
@@ -303,6 +423,145 @@ public final class ChatCanvas extends Canvas {
             y += font.getHeight();
         }
         return y;
+    }
+
+    private void drawTouchToolbar(Graphics graphics, Font font, int width, int height,
+            int toolbarHeight) {
+        int top = height - toolbarHeight;
+        String first = I18n.text(busy ? TextId.STOP : TextId.COMPOSE);
+        String second = I18n.text(profile != null && profile.multimodal
+                ? TextId.IMAGE : TextId.PROFILES);
+        int i;
+        for (i = 0; i < 3; i++) {
+            int left = (width * i) / 3;
+            int right = (width * (i + 1)) / 3;
+            graphics.setColor(i == 2 && moreMenuOpen
+                    ? COLOR_TOOLBAR_PRESSED : COLOR_TOOLBAR);
+            graphics.fillRect(left, top, right - left, toolbarHeight);
+            if (i > 0) {
+                graphics.setColor(0x746ba8);
+                graphics.drawLine(left, top + 4, left, height - 5);
+            }
+            graphics.setFont(font);
+            graphics.setColor(0xffffff);
+            String label = i == 0 ? first
+                    : (i == 1 ? second : I18n.text(TextId.MORE));
+            label = ellipsize(label, font, right - left - 8);
+            graphics.drawString(label, left + (right - left) / 2,
+                    top + (toolbarHeight - font.getHeight()) / 2,
+                    Graphics.TOP | Graphics.HCENTER);
+        }
+    }
+
+    private void drawMoreMenu(Graphics graphics, Font font, int width, int height,
+            int toolbarHeight) {
+        int rowHeight = font.getHeight() + 8;
+        int left = width / 5;
+        int right = width - 4;
+        int bottom = height - toolbarHeight;
+        int top = bottom - rowHeight * MORE_ITEM_COUNT;
+        graphics.setColor(0xffffff);
+        graphics.fillRect(left, top, right - left, bottom - top);
+        graphics.setFont(font);
+        int i;
+        for (i = 0; i < MORE_ITEM_COUNT; i++) {
+            int y = top + i * rowHeight;
+            graphics.setColor(0xd7dbea);
+            graphics.drawLine(left, y, right, y);
+            graphics.setColor(i == MORE_ITEM_COUNT - 1 ? COLOR_ERROR : COLOR_TEXT);
+            graphics.drawString(ellipsize(moreLabel(i), font, right - left - 16),
+                    left + 8, y + 4, Graphics.TOP | Graphics.LEFT);
+        }
+        graphics.setColor(COLOR_HEADER);
+        graphics.drawRect(left, top, right - left, bottom - top);
+    }
+
+    private int toolbarButtonAt(int x, int y) {
+        if (!touchEnabled) return -1;
+        int height = getHeight();
+        int toolbarHeight = Font.getFont(
+                Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight() + 14;
+        if (x < 0 || x >= getWidth() || y < height - toolbarHeight || y >= height) {
+            return -1;
+        }
+        int button = (x * 3) / getWidth();
+        return button > 2 ? 2 : button;
+    }
+
+    private int moreMenuRowAt(int x, int y) {
+        Font font = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+        int toolbarHeight = font.getHeight() + 14;
+        int rowHeight = font.getHeight() + 8;
+        int left = getWidth() / 5;
+        int bottom = getHeight() - toolbarHeight;
+        int top = bottom - rowHeight * MORE_ITEM_COUNT;
+        if (x < left || x >= getWidth() - 4 || y < top || y >= bottom) return -1;
+        int row = (y - top) / rowHeight;
+        return row >= MORE_ITEM_COUNT ? -1 : row;
+    }
+
+    private Command moreCommand(int row) {
+        switch (row) {
+            case 0: return profilesCommand;
+            case 1: return settingsCommand;
+            case 2: return languageCommand;
+            case 3: return thinkingCommand;
+            case 4: return clearCommand;
+            default: return exitCommand;
+        }
+    }
+
+    private String moreLabel(int row) {
+        switch (row) {
+            case 0: return I18n.text(TextId.PROFILES);
+            case 1: return I18n.text(TextId.SETTINGS);
+            case 2: return I18n.text(TextId.LANGUAGE);
+            case 3: return I18n.text(TextId.REASONING);
+            case 4: return I18n.text(TextId.CLEAR);
+            default: return I18n.text(TextId.EXIT);
+        }
+    }
+
+    private void fireCommand(Command command) {
+        if (commandListener != null && command != null) {
+            commandListener.commandAction(command, this);
+        }
+    }
+
+    private int contentTop() {
+        Font bold = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_SMALL);
+        return bold.getHeight() + 14;
+    }
+
+    private int contentBottom() {
+        Font normal = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+        int bottom = getHeight() - normal.getHeight() - 6;
+        if (touchEnabled) bottom -= normal.getHeight() + 14;
+        return bottom;
+    }
+
+    private void clampScroll() {
+        if (scroll < 0) scroll = 0;
+        if (scroll > maximumScroll) scroll = maximumScroll;
+    }
+
+    private static int absolute(int value) {
+        return value < 0 ? -value : value;
+    }
+
+    private static String ellipsize(String value, Font font, int maximumWidth) {
+        if (value == null) return "";
+        if (maximumWidth <= 0) return "";
+        if (font.stringWidth(value) <= maximumWidth) return value;
+        String ellipsis = "…";
+        int ellipsisWidth = font.stringWidth(ellipsis);
+        if (ellipsisWidth > maximumWidth) return "";
+        int length = value.length();
+        while (length > 0
+                && font.substringWidth(value, 0, length) + ellipsisWidth > maximumWidth) {
+            length--;
+        }
+        return value.substring(0, length) + ellipsis;
     }
 
     private void refreshSendCommands() {
@@ -365,7 +624,9 @@ public final class ChatCanvas extends Canvas {
             int bubbleWidth = (canvasWidth * 82) / 100;
             int textWidth = bubbleWidth - 16;
             String valueContent = value.getContent();
-            if (valueContent.length() == 0 && value.pending) valueContent = "正在思考…";
+            if (valueContent.length() == 0 && value.pending) {
+                valueContent = I18n.text(TextId.THINKING_PENDING);
+            }
             content = valueContent;
             hasReasoning = value.hasReasoning();
             reasoning = showReasoning && hasReasoning ? value.getReasoning() : "";
@@ -435,4 +696,3 @@ public final class ChatCanvas extends Canvas {
         }
     }
 }
-

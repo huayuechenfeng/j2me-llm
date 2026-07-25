@@ -2,9 +2,9 @@
 
 
 
-# J2ME LLM v0.2 开发、测试与发布
+# J2ME LLM v0.3 开发、测试与发布
 
-本文说明如何在 Windows 上准备 Java ME 工具链、构建 v0.2、运行自动化测试、用 MicroEmulator 调试，以及在 Sony Ericsson W995 一类真机上做发布验收。更新/恢复的专门测试见 [UPDATE_AND_RECOVERY.md](UPDATE_AND_RECOVERY.md)，内部设计见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+本文说明如何在 Windows 上准备 Java ME 工具链、构建 v0.3、运行自动化测试、用 MicroEmulator 调试，以及在 Sony Ericsson W995 一类真机上做发布验收。更新/恢复的专门测试见 [UPDATE_AND_RECOVERY.md](UPDATE_AND_RECOVERY.md)，内部设计见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ## 1. 开发环境
 
@@ -93,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\build.ps1 -SkipTests
 
 ## 4. 自动化自测
 
-v0.2 的自测都是普通 `public static void main`，不依赖 JUnit；需要 MIDP 类型的请求测试使用最小桌面 stub，便于老工具链和离线构建。构建脚本应运行以下项目：
+v0.3 的自测都是普通 `public static void main`，不依赖 JUnit；需要 MIDP 类型的请求测试使用最小桌面 stub，便于老工具链和离线构建。构建脚本应运行以下项目：
 
 | 自测 | 覆盖点 |
 | --- | --- |
@@ -108,6 +108,7 @@ v0.2 的自测都是普通 `public static void main`，不依赖 JUnit；需要 
 | `ConversationRecordValidatorSelfTest` | 历史记录头、档案 ID、计数边界和 CRC 的无消息解码校验 |
 | `ProvisioningCodecSelfTest` | `.j2cfg` 往返、Base64/CRC/版本、字段和文件上限、重复 ID/活动 ID |
 | `ProvisioningMapperSelfTest` | 四固定档案导入导出、部分导入保留、常开思考规范化、活动档案和模型缓存种子 |
+| `I18nSelfTest` | 自动语言解析、中英文词条完整性、已知错误翻译和内置档案名显示 |
 
 新增纯算法模块时，优先继续使用这种无依赖自测。任何需要 MIDP 类的测试都应尽量把可验证逻辑分离到不依赖设备的 codec/parser，设备 API 留给模拟器和真机验收。
 
@@ -129,13 +130,13 @@ powershell -ExecutionPolicy Bypass -File .\tools\run-emulator.ps1
 
 脚本会先完整构建，再临时映射一个空闲盘符来绕过 MicroEmulator 2.0.4 对 Unicode JAR URL 的限制，把最终 JAR 交给模拟器；退出模拟器后会移除映射。至少检查：
 
-1. MIDlet 可启动，中文菜单和气泡无乱码；
+1. MIDlet 可启动，中英文菜单和气泡无乱码，语言切换后命令立即重建；
 2. 四档案可切换，标题、设置和聊天随活动档案变化；
 3. 多模态关闭时没有图片发送负担；
 4. 空模型不能发送，错误提示能返回原界面；
 5. 流式响应期间可停止，UI 不冻结；
 6. 思考请求模式与“思维链”展开/折叠互不改变；
-7. 长响应重绘大约每 100 ms 合并一次，方向键滚动仍可用；
+7. 长响应重绘大约每 100 ms 合并一次，方向键与触屏拖动滚动均可用；
 8. 保存后退出并重启，活动档案、模型缓存与各历史仍在；
 9. 导入/导出在具备 JSR-75 的运行配置下工作；缺 JSR-75 时给出能力提示而不是启动失败。
 
@@ -269,7 +270,7 @@ node .\gateway\server.js
 
 ### 8.7 覆盖更新与恢复
 
-- [ ] 从实际 v0.1.0 包创建配置和历史，再覆盖安装 0.2.0。
+- [ ] 从实际 v0.1.0 / v0.2.0 包创建配置和历史，再覆盖安装 0.3.0。
 - [ ] 安装器明确识别更新，Name/Vendor/签名一致。
 - [ ] 旧配置和历史迁入“自定义（旧配置）”，其他档案保持默认。
 - [ ] 连续重启两次不会重复迁移。
@@ -308,7 +309,7 @@ node .\gateway\server.js
 
 ### 11.1 版本与描述符
 
-- [ ] `config/manifest.mf` 与生成 JAD 都是 `MIDlet-Version: 0.2.0`。
+- [ ] `config/manifest.mf` 与生成 JAD 都是 `MIDlet-Version: 0.3.0`。
 - [ ] Name/Vendor 与 v0.1 完全相同，大小写和空格也相同。
 - [ ] JAD 的 `MIDlet-Jar-Size` 等于最终 JAR 实际字节数。
 - [ ] 必需权限只有 HTTP/HTTPS；JSR-75 file read/write 为可选权限。
@@ -320,7 +321,7 @@ node .\gateway\server.js
 - [ ] `node gateway/self-test.js` 通过。
 - [ ] MicroEmulator 验收通过。
 - [ ] 目标真机清单通过。
-- [ ] v0.1 → v0.2 覆盖更新与恢复矩阵通过。
+- [ ] v0.1/v0.2 → v0.3 覆盖更新与恢复矩阵通过。
 - [ ] `provisioner/index.html` 断网生成/读回通过。
 - [ ] JAR/JAD/生成器/网关不含真实 Key、私人端点或测试对话。
 - [ ] 文档中的版本、命令、限制与最终二进制一致。
@@ -330,7 +331,7 @@ node .\gateway\server.js
 建议归档：
 
 ```text
-J2ME-LLM-0.2.0/
+J2ME-LLM-0.3.0/
   J2ME-LLM.jar
   J2ME-LLM.jad
   provisioner/index.html
@@ -361,9 +362,7 @@ CLDC/MIDP/JSR-75 能力：
 
 报告中必须删除 Authorization、`.j2cfg` payload、真实敏感提示词和可识别的私人图片。
 
-本文按 2026-07-22 的 v0.2 工具链与源码结构编写。
-
-
+本文按 2026-07-25 的 v0.3 工具链与源码结构编写。
 
 
 

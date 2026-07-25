@@ -138,7 +138,7 @@ function createGateway(input) {
           headers: {
             authorization: 'Bearer ' + config.upstreamApiKey,
             accept: 'application/json',
-            'user-agent': 'J2ME-LLM-Gateway/0.2.0',
+            'user-agent': 'J2ME-LLM-Gateway/0.3.0',
           },
           redirect: 'error',
         });
@@ -166,7 +166,7 @@ function createGateway(input) {
           authorization: 'Bearer ' + config.upstreamApiKey,
           'content-type': 'application/json; charset=utf-8',
           accept: request.headers.accept || 'text/event-stream, application/json',
-          'user-agent': 'J2ME-LLM-Gateway/0.2.0',
+          'user-agent': 'J2ME-LLM-Gateway/0.3.0',
         },
         body: JSON.stringify(body),
         redirect: 'error',
@@ -209,4 +209,3 @@ if (require.main === module) {
 }
 
 module.exports = { createGateway, fromEnvironment };
-

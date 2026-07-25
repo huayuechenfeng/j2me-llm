@@ -2,13 +2,21 @@
 
 **简体中文** | [English](README.en.md)
 
-J2ME LLM 是一个面向 CLDC 1.1 / MIDP 2.0 手机和 Java ME 模拟器的轻量 OpenAI Chat Completions 兼容客户端。v0.2.0 在索爱 W995 可运行的 v0.1 基础上加入多档案、官方预设、按需模型目录、真正独立的思考开关、低内存请求写出，以及可通过蓝牙传输的离线配置包。
+J2ME LLM 是一个面向 CLDC 1.1 / MIDP 2.0 手机和 Java ME 模拟器的轻量 OpenAI Chat Completions 兼容客户端。当前发布版本为 v0.3.0，在 v0.2.0 的多档案、模型目录、思考控制、低内存请求和离线配置包基础上，加入中英双语界面与触屏全屏工具栏。
 
-**下载 v0.2.0：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM.jad) · [离线配置生成器 HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM-Config-Generator-v0.2.0.html) · [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM-Gateway-v0.2.0-windows-x64.zip) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.2.0)
+**下载 v0.3.0：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jad) · [离线配置生成器 HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Config-Generator-v0.3.0.html) · [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Gateway-v0.3.0-windows-x64.zip) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.3.0)
 
-> **开发说明：** v0.2.0 是 J2ME LLM 的首个公开发布版本；v0.1.0 只是未公开的开发与 W995 实机验证版本。本项目由 Chihoko 提出产品方向并完成实机验证，通过 AI 辅助的 vibe coding 协作完成设计、实现、测试与文档。
+> **项目说明：** v0.3.0 是当前公开版本，v0.2.0 是首个公开版本；v0.1.0 只是未公开的开发与 W995 实机验证版本。本项目由 Chihoko 提出产品方向并完成实机验证，通过 AI 辅助的 vibe coding 协作完成设计、实现、测试与文档。
 
-## v0.2.0 功能
+## v0.3.0 新增
+
+- 界面支持简体中文、English 和跟随系统；自动模式下 `zh*` 区域使用中文，其余使用英文。
+- 语言偏好保存在独立的 `J2MELLM_UI_PREFS`，不会改写档案、配置包或聊天记录。
+- 触屏设备使用全屏聊天界面和三按钮工具栏：输入/停止、图片/档案、更多。
+- “更多”包含档案、设置、语言、思维链、清空和退出；支持拖动滚动、点击命中和旋转/尺寸变化重排。
+- 非触屏设备继续使用原有软键命令和方向键滚动；一个通用 JAR 同时覆盖两类设备。
+
+## v0.2.0 基础功能
 
 - OpenAI、DeepSeek、Kimi、自定义四个固定档案，Key、模型、端点、思考、多模态、模型缓存和聊天历史彼此隔离。
 - 首次覆盖升级时读取旧 `J2MELLM_CFG`，迁移到“自定义（旧配置）”；旧配置库不会被删除。
@@ -47,7 +55,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\build.ps1
 - `dist/J2ME-LLM.jar`
 - `dist/J2ME-LLM.jad`
 
-构建脚本运行 11 组桌面自测、ECJ Java 1.3 / class 1.1 编译和 Java ME 预验证。发布包不要使用 `-SkipTests`。
+构建脚本运行 12 组桌面自测、ECJ Java 1.3 / class 1.1 编译和 Java ME 预验证。发布包不要使用 `-SkipTests`。
 
 启动 MicroEmulator：
 
@@ -68,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\test-rms-upgrade-recovery.ps1
 从 v0.1 更新时：
 
 1. 不要卸载旧应用；卸载 Java ME suite 通常会删除其 RMS。
-2. 保持 `MIDlet-Name: J2ME LLM` 与 `MIDlet-Vendor: Chihoko` 不变，用 v0.2.0 JAD 执行“更新/替换”。
+2. 保持 `MIDlet-Name: J2ME LLM` 与 `MIDlet-Vendor: Chihoko` 不变，用 v0.3.0 JAD 执行“更新/替换”。
 3. 首次启动确认活动档案为“自定义（旧配置）”，再核对端点、Key、模型和旧聊天。
 4. 升级完成后立即导出一份 `.j2cfg` 配置备份。
 

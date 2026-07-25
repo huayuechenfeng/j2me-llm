@@ -3,6 +3,8 @@
 
 package com.chihoko.j2mellm;
 
+import com.chihoko.j2mellm.i18n.I18n;
+import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.model.ChatMessage;
 import com.chihoko.j2mellm.model.ImageAttachment;
 import com.chihoko.j2mellm.model.ProfileState;
@@ -16,6 +18,7 @@ import com.chihoko.j2mellm.provision.ProvisioningMapper;
 import com.chihoko.j2mellm.provision.ProvisioningPackage;
 import com.chihoko.j2mellm.store.ProfileConversationStore;
 import com.chihoko.j2mellm.store.ProfileStore;
+import com.chihoko.j2mellm.store.LanguageStore;
 import com.chihoko.j2mellm.ui.ChatCanvas;
 import com.chihoko.j2mellm.ui.ConfigPickListener;
 import com.chihoko.j2mellm.ui.ConfigPickerController;
@@ -24,6 +27,7 @@ import com.chihoko.j2mellm.ui.ImageLoader;
 import com.chihoko.j2mellm.ui.ImagePickListener;
 import com.chihoko.j2mellm.ui.ImagePickerController;
 import com.chihoko.j2mellm.ui.ImageScaler;
+import com.chihoko.j2mellm.ui.LanguageScreen;
 import com.chihoko.j2mellm.ui.ModelListScreen;
 import com.chihoko.j2mellm.ui.ProfileListScreen;
 import com.chihoko.j2mellm.ui.SettingsForm;
@@ -50,12 +54,13 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
     private static final int MAX_IN_MEMORY_MESSAGES = 32;
 
     private final ProfileStore profileStore = new ProfileStore();
+    private final LanguageStore languageStore = new LanguageStore();
     private final OpenAiChatClient client = new OpenAiChatClient();
     private final ModelCatalogClient modelClient = new ModelCatalogClient();
-    private final Command sendCommand = new Command("发送", Command.OK, 1);
-    private final Command cancelEditCommand = new Command("返回", Command.BACK, 2);
-    private final Command deleteImportedCommand = new Command("删除配置包", Command.OK, 1);
-    private final Command keepImportedCommand = new Command("保留文件", Command.BACK, 2);
+    private Command sendCommand;
+    private Command cancelEditCommand;
+    private Command deleteImportedCommand;
+    private Command keepImportedCommand;
 
     private Display display;
     private ProfileState profileState;
@@ -66,6 +71,7 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
     private SettingsForm settingsForm;
     private ProfileListScreen profileList;
     private ModelListScreen modelList;
+    private LanguageScreen languageScreen;
     private TextBox editor;
     private Displayable settingsBack;
     private Displayable modelsBack;
@@ -81,9 +87,13 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         if (started) return;
         started = true;
         display = Display.getDisplay(this);
+        I18n.initialize(languageStore.load(), systemLocale());
+        createCommands();
         profileState = profileStore.load();
         profile = profileState.getActiveProfile();
-        if (profile == null) throw new IllegalStateException("没有可用模型档案");
+        if (profile == null) {
+            throw new IllegalStateException(I18n.text(TextId.NO_AVAILABLE_PROFILES));
+        }
         loadConversation(profile.id);
         chatCanvas = new ChatCanvas(messages, profile, this);
 
@@ -94,7 +104,9 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
             target = profileList;
         }
         String notice = startupNotice();
-        if (notice.length() > 0) showAlert("v0.2 数据检查", notice, AlertType.INFO, target, 5000);
+        if (notice.length() > 0) {
+            showAlert(I18n.text(TextId.STARTUP_CHECK), notice, AlertType.INFO, target, 5000);
+        }
         else display.setCurrent(target);
     }
 
@@ -117,6 +129,7 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         else if (source == settingsForm) handleSettingsCommand(command);
         else if (source == profileList) handleProfileListCommand(command);
         else if (source == modelList) handleModelListCommand(command);
+        else if (source == languageScreen) handleLanguageCommand(command);
         else if (source == importResultAlert) handleImportResultCommand(command);
     }
 
@@ -132,6 +145,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
             if (ensureIdle()) openProfileList();
         } else if (command == chatCanvas.settingsCommand) {
             if (ensureIdle()) openSettings(chatCanvas);
+        } else if (command == chatCanvas.languageCommand) {
+            if (ensureIdle()) openLanguage();
         } else if (command == chatCanvas.thinkingCommand) {
             chatCanvas.toggleReasoning();
             saveProfilesQuietly();
@@ -157,7 +172,7 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         if (command == sendCommand) {
             String text = editor.getString().trim();
             if (text.length() > 0 || pendingAttachment != null) {
-                if (text.length() == 0) text = "请描述这张图片。";
+                if (text.length() == 0) text = I18n.text(TextId.DEFAULT_IMAGE_PROMPT);
                 send(text, pendingAttachment);
                 pendingAttachment = null;
             }
@@ -220,9 +235,39 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         }
     }
 
+    private void handleLanguageCommand(Command command) {
+        if (command == languageScreen.applyCommand) {
+            int preference = languageScreen.selectedPreference();
+            try {
+                languageStore.save(preference);
+            } catch (Exception failure) {
+                showAlert(I18n.text(TextId.LANGUAGE_SAVE_FAILED), message(failure),
+                        AlertType.ERROR, languageScreen, 3500);
+                return;
+            }
+            I18n.initialize(preference, systemLocale());
+            createCommands();
+            chatCanvas = new ChatCanvas(messages, profile, this);
+            settingsForm = null;
+            profileList = null;
+            modelList = null;
+            languageScreen = null;
+            display.setCurrent(chatCanvas);
+        } else if (command == languageScreen.backCommand) {
+            display.setCurrent(chatCanvas);
+        }
+    }
+
+    private void openLanguage() {
+        languageScreen = new LanguageScreen(this);
+        display.setCurrent(languageScreen);
+    }
+
     private void openEditor() {
         if (client.isRunning()) return;
-        String title = pendingAttachment == null ? "发送消息" : "图片：" + pendingAttachment.name;
+        String title = pendingAttachment == null
+                ? I18n.text(TextId.SEND_MESSAGE)
+                : I18n.text(TextId.IMAGE_PREFIX) + pendingAttachment.name;
         editor = new TextBox(title, "", 4096, TextField.ANY);
         editor.addCommand(sendCommand);
         editor.addCommand(cancelEditCommand);
@@ -232,7 +277,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
 
     private void openImagePicker() {
         if (!profile.multimodal) {
-            showAlert("多模态已关闭", "请先在当前档案设置中开启多模态。",
+            showAlert(I18n.text(TextId.MULTIMODAL_DISABLED),
+                    I18n.text(TextId.ENABLE_MULTIMODAL_FIRST),
                     AlertType.WARNING, chatCanvas, 2500);
             return;
         }
@@ -246,11 +292,13 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                 }
 
                 public void onImagePickError(String message) {
-                    showAlert("图片选择失败", message, AlertType.ERROR, chatCanvas, 3500);
+                    showAlert(I18n.text(TextId.IMAGE_PICK_FAILED), I18n.error(message),
+                            AlertType.ERROR, chatCanvas, 3500);
                 }
             });
         } catch (Throwable failure) {
-            showAlert("不支持文件选择", "此手机需要 JSR-75 FileConnection。",
+            showAlert(I18n.text(TextId.FILE_PICK_UNSUPPORTED),
+                    I18n.text(TextId.JSR75_REQUIRED),
                     AlertType.WARNING, chatCanvas, 3500);
         }
     }
@@ -267,17 +315,19 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         String oldModelsEndpoint = edited.modelsEndpoint;
         settingsForm.copyTo(edited);
         if (!startsWithHttp(edited.endpoint)) {
-            showAlert("配置错误", "聊天端点必须以 http:// 或 https:// 开头。",
+            showAlert(I18n.text(TextId.CONFIG_ERROR),
+                    I18n.text(TextId.CHAT_ENDPOINT_INVALID),
                     AlertType.ERROR, settingsForm, 3000);
             return false;
         }
         if (!startsWithHttp(edited.modelsEndpoint)) {
-            showAlert("配置错误", "模型列表端点必须以 http:// 或 https:// 开头。",
+            showAlert(I18n.text(TextId.CONFIG_ERROR),
+                    I18n.text(TextId.MODELS_ENDPOINT_INVALID),
                     AlertType.ERROR, settingsForm, 3000);
             return false;
         }
         if (requireModel && edited.model.length() == 0) {
-            showAlert("配置错误", "请填写或从模型列表选择模型。",
+            showAlert(I18n.text(TextId.CONFIG_ERROR), I18n.text(TextId.MODEL_REQUIRED),
                     AlertType.ERROR, settingsForm, 3000);
             return false;
         }
@@ -290,14 +340,15 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         } catch (Exception failure) {
             profileState.replace(original);
             profile = original;
-            showAlert("保存失败", message(failure), AlertType.ERROR, settingsForm, 3500);
+            showAlert(I18n.text(TextId.SAVE_FAILED), message(failure),
+                    AlertType.ERROR, settingsForm, 3500);
             return false;
         }
         chatCanvas.setProfile(profile);
         if (profileList != null) profileList.refresh();
         if (confirmation) {
             Displayable next = settingsBack == null ? chatCanvas : settingsBack;
-            showAlert("已保存", "当前档案已保存到带恢复副本的 RMS。",
+            showAlert(I18n.text(TextId.SAVED), I18n.text(TextId.PROFILE_SAVED),
                     AlertType.CONFIRMATION, next, 2500);
         }
         return true;
@@ -326,7 +377,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
             profileStore.save(profileState);
         } catch (Exception failure) {
             profileState.activeProfileId = oldId;
-            showAlert("切换失败", message(failure), AlertType.ERROR, profileList, 3500);
+            showAlert(I18n.text(TextId.SWITCH_FAILED), message(failure),
+                    AlertType.ERROR, profileList, 3500);
             return false;
         }
         profile = target;
@@ -334,7 +386,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         chatCanvas.setConversation(messages, profile);
         if (profileList != null) profileList.refresh();
         if (conversationStore.didRecoverFromBackup()) {
-            showAlert("历史已恢复", "当前档案的主记录损坏，已从 RMS 恢复副本载入。",
+            showAlert(I18n.text(TextId.HISTORY_RECOVERED),
+                    I18n.text(TextId.HISTORY_RECOVERED_BODY),
                     AlertType.WARNING, chatCanvas, 4000);
         }
         return true;
@@ -353,7 +406,7 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         final int requestGeneration = ++modelRequestGeneration;
         final ProviderProfile requestedProfile = profile;
         final ModelListScreen requestedScreen = modelList;
-        requestedScreen.setTitle("正在获取模型…");
+        requestedScreen.setTitle(I18n.text(TextId.FETCHING_MODELS));
         modelClient.fetch(requestedProfile.modelsEndpoint, requestedProfile.apiKey,
                 new ModelCatalogListener() {
             public void onModels(final Vector ids, final boolean truncated) {
@@ -376,16 +429,19 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                         } catch (Exception failure) {
                             saveError = message(failure);
                         }
-                        requestedScreen.setTitle("选择模型");
+                        requestedScreen.setTitle(I18n.text(TextId.SELECT_MODEL));
                         requestedScreen.refresh(requestedProfile);
-                        String text = "已获取 " + requestedProfile.cachedModels.size() + " 个模型。";
-                        if (truncated) text += " 列表已按 64 项内存上限截断。";
+                        String text = I18n.text(TextId.FETCHED_PREFIX)
+                                + requestedProfile.cachedModels.size()
+                                + I18n.text(TextId.MODELS_SUFFIX);
+                        if (truncated) text += I18n.text(TextId.MODEL_LIST_TRUNCATED);
                         if (saveError == null) {
-                            showAlert("模型列表已更新", text + " 已保存到 RMS。",
+                            showAlert(I18n.text(TextId.MODELS_UPDATED),
+                                    text + I18n.text(TextId.SAVED_TO_RMS_SUFFIX),
                                     AlertType.CONFIRMATION, requestedScreen, 3000);
                         } else {
-                            showAlert("模型已获取但未保存",
-                                    text + " 当前会话仍可选择；重启后可能丢失。\n" + saveError,
+                            showAlert(I18n.text(TextId.MODELS_NOT_SAVED),
+                                    text + I18n.text(TextId.MODELS_SESSION_ONLY) + saveError,
                                     AlertType.WARNING, requestedScreen, 5000);
                         }
                     }
@@ -397,8 +453,9 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                     public void run() {
                         if (!isCurrentModelRequest(requestGeneration,
                                 requestedProfile, requestedScreen)) return;
-                        requestedScreen.setTitle("选择模型");
-                        showAlert("获取失败", error, AlertType.ERROR, requestedScreen, 4000);
+                        requestedScreen.setTitle(I18n.text(TextId.SELECT_MODEL));
+                        showAlert(I18n.text(TextId.FETCH_FAILED), I18n.error(error),
+                                AlertType.ERROR, requestedScreen, 4000);
                     }
                 });
             }
@@ -427,7 +484,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
             profileStore.save(profileState);
         } catch (Exception failure) {
             profile.model = old;
-            showAlert("保存失败", message(failure), AlertType.ERROR, modelList, 3500);
+            showAlert(I18n.text(TextId.SAVE_FAILED), message(failure),
+                    AlertType.ERROR, modelList, 3500);
             return;
         }
         chatCanvas.setProfile(profile);
@@ -451,17 +509,19 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                 }
 
                 public void onConfigPickError(String error) {
-                    showAlert("导入失败", error, AlertType.ERROR, profileList, 4000);
+                    showAlert(I18n.text(TextId.IMPORT_FAILED), I18n.error(error),
+                            AlertType.ERROR, profileList, 4000);
                 }
             });
         } catch (Throwable failure) {
-            showAlert("不支持导入", "此手机需要 JSR-75 FileConnection。",
+            showAlert(I18n.text(TextId.IMPORT_UNSUPPORTED),
+                    I18n.text(TextId.JSR75_REQUIRED),
                     AlertType.WARNING, profileList, 3500);
         }
     }
 
     private void importConfiguration(final String fileUrl) {
-        showProgress("正在导入", "正在校验 .j2cfg 配置包…");
+        showProgress(I18n.text(TextId.IMPORTING), I18n.text(TextId.VALIDATING_CONFIG));
         new Thread(new Runnable() {
             public void run() {
                 try {
@@ -473,7 +533,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                 } catch (final Throwable failure) {
                     display.callSerially(new Runnable() {
                         public void run() {
-                            showAlert("导入失败", message(failure), AlertType.ERROR,
+                            showAlert(I18n.text(TextId.IMPORT_FAILED), message(failure),
+                                    AlertType.ERROR,
                                     profileList, 5000);
                         }
                     });
@@ -488,7 +549,9 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         try {
             profileStore.save(imported);
         } catch (Exception failure) {
-            showAlert("导入失败", "RMS 写入失败：" + message(failure), AlertType.ERROR,
+            showAlert(I18n.text(TextId.IMPORT_FAILED),
+                    I18n.text(TextId.RMS_WRITE_FAILED_PREFIX) + message(failure),
+                    AlertType.ERROR,
                     profileList, 5000);
             return;
         }
@@ -498,8 +561,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         chatCanvas.setConversation(messages, profile);
         profileList = new ProfileListScreen(profileState, this);
         importedFileUrl = fileUrl;
-        importResultAlert = new Alert("导入成功",
-                "配置档案已写入 RMS。配置包含明文密钥；若不再需要，建议现在删除蓝牙传来的文件。",
+        importResultAlert = new Alert(I18n.text(TextId.IMPORT_SUCCEEDED),
+                I18n.text(TextId.IMPORT_SUCCEEDED_BODY),
                 null, AlertType.CONFIRMATION);
         importResultAlert.setTimeout(Alert.FOREVER);
         importResultAlert.addCommand(deleteImportedCommand);
@@ -510,7 +573,7 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
 
     private void exportConfiguration() {
         final ProvisioningPackage pack = ProvisioningMapper.exportProfiles(profileState);
-        showProgress("正在导出", "正在生成含校验值的 .j2cfg 备份…");
+        showProgress(I18n.text(TextId.EXPORTING), I18n.text(TextId.GENERATING_BACKUP));
         new Thread(new Runnable() {
             public void run() {
                 try {
@@ -519,14 +582,16 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                     files.exportFile(url, pack);
                     display.callSerially(new Runnable() {
                         public void run() {
-                            showAlert("导出成功", url + "\n文件含明文密钥，请妥善保管。",
+                            showAlert(I18n.text(TextId.EXPORT_SUCCEEDED),
+                                    url + I18n.text(TextId.SECRET_FILE_WARNING_SUFFIX),
                                     AlertType.CONFIRMATION, profileList, 5000);
                         }
                     });
                 } catch (final Throwable failure) {
                     display.callSerially(new Runnable() {
                         public void run() {
-                            showAlert("导出失败", message(failure), AlertType.ERROR,
+                            showAlert(I18n.text(TextId.EXPORT_FAILED), message(failure),
+                                    AlertType.ERROR,
                                     profileList, 5000);
                         }
                     });
@@ -536,21 +601,24 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
     }
 
     private void deleteImportedFile(final String fileUrl) {
-        showProgress("正在删除", "正在删除已导入的明文配置包…");
+        showProgress(I18n.text(TextId.DELETING),
+                I18n.text(TextId.DELETING_IMPORTED_CONFIG));
         new Thread(new Runnable() {
             public void run() {
                 try {
                     newFileService().deleteFile(fileUrl);
                     display.callSerially(new Runnable() {
                         public void run() {
-                            showAlert("已删除", "配置包已从文件系统删除，档案仍保存在 RMS。",
+                            showAlert(I18n.text(TextId.DELETED),
+                                    I18n.text(TextId.DELETED_BODY),
                                     AlertType.CONFIRMATION, profileList, 3500);
                         }
                     });
                 } catch (final Throwable failure) {
                     display.callSerially(new Runnable() {
                         public void run() {
-                            showAlert("删除失败", message(failure), AlertType.ERROR,
+                            showAlert(I18n.text(TextId.DELETE_FAILED), message(failure),
+                                    AlertType.ERROR,
                                     profileList, 4500);
                         }
                     });
@@ -567,7 +635,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
 
     private void send(String text, ImageAttachment attachment) {
         if (!profile.isReady()) {
-            showAlert("尚未配置", "请先填写端点和模型名称。",
+            showAlert(I18n.text(TextId.NOT_CONFIGURED),
+                    I18n.text(TextId.CONFIGURE_ENDPOINT_MODEL),
                     AlertType.WARNING, chatCanvas, 3000);
             return;
         }
@@ -578,14 +647,14 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
             try {
                 ImageDimensions dimensions = ImageDimensions.parse(attachment.data);
                 if (dimensions == null || !dimensions.fitsPixelLimit(65536)) {
-                    throw new IOException("图片尺寸不适合本机预览");
+                    throw new IOException(I18n.text(TextId.IMAGE_PREVIEW_UNSUITABLE));
                 }
                 ensurePreviewMemory(attachment.data.length, dimensions.pixelCountOrMaximum());
                 Image preview = Image.createImage(attachment.data, 0, attachment.data.length);
                 user.setImagePreview(ImageScaler.fit(preview, previewWidth(), 160));
                 preview = null;
             } catch (Throwable ignored) {
-                user.setImageStatus("图片已附带（本机内存不足或无法预览）");
+                user.setImageStatus(I18n.text(TextId.IMAGE_ATTACHED_NO_PREVIEW));
             }
         }
         final ChatMessage assistant = new ChatMessage(ChatMessage.ROLE_ASSISTANT, "");
@@ -616,7 +685,7 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
             public void onImage(String source) {
                 if (!requestProfile.multimodal) return;
                 assistant.setImageSource(source);
-                assistant.setImageStatus("正在加载图片…");
+                assistant.setImageStatus(I18n.text(TextId.LOADING_IMAGE));
                 chatCanvas.contentChanged();
             }
 
@@ -631,10 +700,11 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                         }
                         if (assistant.getContent().length() == 0) {
                             assistant.appendContent(source == null || source.length() == 0
-                                    ? "（模型未返回正文）" : "（图片响应）");
+                                    ? I18n.text(TextId.MODEL_NO_TEXT)
+                                    : I18n.text(TextId.IMAGE_RESPONSE));
                         } else if (source != null && source.startsWith("data:image/")
                                 && assistant.getContent().startsWith(source)) {
-                            assistant.replaceContent("（图片响应）");
+                            assistant.replaceContent(I18n.text(TextId.IMAGE_RESPONSE));
                         }
                         if (activeAssistant == assistant) activeAssistant = null;
                         pruneConversation();
@@ -652,7 +722,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
                         assistant.pending = false;
                         assistant.error = true;
                         if (assistant.getContent().length() == 0) {
-                            assistant.appendContent("请求失败：" + error);
+                            assistant.appendContent(I18n.text(TextId.REQUEST_FAILED_PREFIX)
+                                    + I18n.error(error));
                         }
                         if (activeAssistant == assistant) activeAssistant = null;
                         pruneConversation();
@@ -668,7 +739,7 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
     private void loadImage(final ChatMessage message) {
         String source = message.getImageSource();
         if (source == null || source.length() == 0) return;
-        message.setImageStatus("正在加载图片…");
+        message.setImageStatus(I18n.text(TextId.LOADING_IMAGE));
         new ImageLoader().load(source, previewWidth(), 180, new ImageLoadListener() {
             public void onImageLoaded(final Image image) {
                 display.callSerially(new Runnable() {
@@ -684,9 +755,10 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
             public void onImageLoadError(final String reason) {
                 display.callSerially(new Runnable() {
                     public void run() {
-                        String value = reason == null ? "未知错误" : reason;
+                        String value = I18n.error(reason);
                         if (value.length() > 80) value = value.substring(0, 80) + "…";
-                        message.setImageStatus("图片无法显示：" + value);
+                        message.setImageStatus(
+                                I18n.text(TextId.IMAGE_DISPLAY_FAILED_PREFIX) + value);
                         message.releaseInlineImageSource();
                         chatCanvas.contentChanged();
                     }
@@ -698,7 +770,9 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
     private void finishCancelled() {
         if (activeAssistant != null) {
             activeAssistant.pending = false;
-            if (activeAssistant.getContent().length() == 0) activeAssistant.appendContent("（已停止）");
+            if (activeAssistant.getContent().length() == 0) {
+                activeAssistant.appendContent(I18n.text(TextId.STOPPED));
+            }
             activeAssistant = null;
         }
         chatCanvas.setBusy(false);
@@ -771,7 +845,8 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
 
     private boolean ensureIdle() {
         if (client.isRunning()) {
-            showAlert("请求进行中", "请先停止当前请求，再切换档案或设置。",
+            showAlert(I18n.text(TextId.REQUEST_IN_PROGRESS),
+                    I18n.text(TextId.STOP_REQUEST_FIRST),
                     AlertType.WARNING, chatCanvas, 2500);
             return false;
         }
@@ -786,22 +861,28 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
     private void ensurePreviewMemory(int compressedBytes, int pixels) throws IOException {
         long free = Runtime.getRuntime().freeMemory();
         long reserve = compressedBytes + pixels * 4L + 131072L;
-        if (free > 0 && free < reserve) throw new IOException("可用内存不足");
+        if (free > 0 && free < reserve) {
+            throw new IOException(I18n.text(TextId.LOW_MEMORY));
+        }
     }
 
     private String startupNotice() {
         StringBuffer text = new StringBuffer();
         if (profileState.migratedThisLoad) {
-            text.append("已把 v0.1 配置迁移到“自定义（旧配置）”，旧 RMS 保留。\n");
+            text.append(I18n.text(TextId.MIGRATED_V01));
         }
         if (profileState.recoveredFromBackup) {
-            text.append("档案主记录损坏，已从 RMS 恢复副本修复。\n");
+            text.append(I18n.text(TextId.PROFILE_RECOVERED));
         }
         if (profileState.storageCorrupt) {
-            text.append("档案主副记录均不可读，当前载入安全默认值；请导入 .j2cfg 备份。");
+            text.append(I18n.text(TextId.PROFILE_STORAGE_CORRUPT)).append('\n');
         }
-        if (conversationStore.didMigrateLegacy()) text.append("旧聊天记录已迁移。\n");
-        if (conversationStore.didRecoverFromBackup()) text.append("聊天记录已从恢复副本载入。");
+        if (conversationStore.didMigrateLegacy()) {
+            text.append(I18n.text(TextId.CHAT_MIGRATED));
+        }
+        if (conversationStore.didRecoverFromBackup()) {
+            text.append(I18n.text(TextId.CHAT_RECOVERED));
+        }
         return text.toString().trim();
     }
 
@@ -812,7 +893,23 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
 
     private String message(Throwable failure) {
         String value = failure.getMessage();
-        return value == null ? failure.toString() : value;
+        return I18n.error(value == null ? failure.toString() : value);
+    }
+
+    private void createCommands() {
+        sendCommand = new Command(I18n.text(TextId.SEND), Command.OK, 1);
+        cancelEditCommand = new Command(I18n.text(TextId.BACK), Command.BACK, 2);
+        deleteImportedCommand = new Command(
+                I18n.text(TextId.DELETE_CONFIG_PACKAGE), Command.OK, 1);
+        keepImportedCommand = new Command(I18n.text(TextId.KEEP_FILE), Command.BACK, 2);
+    }
+
+    private String systemLocale() {
+        try {
+            return System.getProperty("microedition.locale");
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private void showProgress(String title, String text) {
@@ -828,6 +925,3 @@ public final class LlmMidlet extends MIDlet implements CommandListener {
         display.setCurrent(alert, next);
     }
 }
-
-
-

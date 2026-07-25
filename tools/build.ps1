@@ -57,6 +57,11 @@ try {
             'src\com\chihoko\j2mellm\model\ProviderProfile.java',
             'src\com\chihoko\j2mellm\model\ProviderPresets.java',
             'src\com\chihoko\j2mellm\model\ProfileState.java',
+            'src\com\chihoko\j2mellm\i18n\TextId.java',
+            'src\com\chihoko\j2mellm\i18n\TextCatalog.java',
+            'src\com\chihoko\j2mellm\i18n\TextZh.java',
+            'src\com\chihoko\j2mellm\i18n\TextEn.java',
+            'src\com\chihoko\j2mellm\i18n\I18n.java',
             'src\com\chihoko\j2mellm\net\ChatListener.java',
             'src\com\chihoko\j2mellm\net\ThinkingFilter.java',
             'src\com\chihoko\j2mellm\net\ThinkingRequestPolicy.java',
@@ -84,7 +89,8 @@ try {
             'com.chihoko.j2mellm.store.ProfileCodecSelfTest',
             'com.chihoko.j2mellm.store.ConversationRecordValidatorSelfTest',
             'com.chihoko.j2mellm.provision.ProvisioningCodecSelfTest',
-            'com.chihoko.j2mellm.provision.ProvisioningMapperSelfTest'
+            'com.chihoko.j2mellm.provision.ProvisioningMapperSelfTest',
+            'com.chihoko.j2mellm.i18n.I18nSelfTest'
         )
         foreach ($testClass in $testClasses) {
             & java -cp $runtimeClassPath $testClass
@@ -124,9 +130,10 @@ try {
     $jarSize = (Get-Item -LiteralPath $finalJar).Length
     $jadLines = @(
         'MIDlet-Name: J2ME LLM',
-        'MIDlet-Version: 0.2.0',
+        'MIDlet-Version: 0.3.0',
         'MIDlet-Vendor: Chihoko',
         'MIDlet-1: J2ME LLM,,com.chihoko.j2mellm.LlmMidlet',
+        'Nokia-MIDlet-On-Screen-Keypad: no',
         'MicroEdition-Configuration: CLDC-1.1',
         'MicroEdition-Profile: MIDP-2.0',
         'MIDlet-Permissions: javax.microedition.io.Connector.http, javax.microedition.io.Connector.https',
@@ -145,7 +152,6 @@ try {
 } finally {
     Pop-Location
 }
-
 
 
 

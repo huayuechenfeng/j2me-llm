@@ -1,12 +1,12 @@
-# J2ME LLM v0.2 HTTPS 兼容网关
+# J2ME LLM v0.3 HTTPS 兼容网关
 
 这个零依赖的 Node.js 18+ 网关用于解决老式 J2ME 手机无法协商现代 HTTPS/TLS 的问题。手机只连接受信任局域网中的 HTTP 网关，网关再通过现代 HTTPS 访问 LLM 服务商。真实服务商密钥只保存在网关电脑上，不需要写入手机。
 
-v0.2 同时代理聊天和模型目录，因此 MIDlet 的“获取模型”功能在索爱 W995 等旧设备上也可以通过网关工作。
+v0.3 网关同时代理聊天和模型目录，因此 MIDlet 的“获取模型”功能在索爱 W995 等旧设备上也可以通过网关工作。
 
 ## 独立一键包
 
-普通用户无需安装 Node.js，也无需下载项目源码。下载并解压 [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.2.0/J2ME-LLM-Gateway-v0.2.0-windows-x64.zip)，编辑 `gateway.conf` 后双击“启动网关.bat”即可。压缩包内置经过官方校验的 Node.js v24.14.0 运行时、中文 README 和许可证；`DEVICE_TOKEN=AUTO` 会生成并保存便于九宫格输入的 12 位纯数字令牌。整个解压目录可移动到任意位置，但不能只复制 BAT。
+普通用户无需安装 Node.js，也无需下载项目源码。下载并解压 [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Gateway-v0.3.0-windows-x64.zip)，编辑 `gateway.conf` 后双击“启动网关.bat”即可。压缩包内置经过官方校验的 Node.js v24.14.0 运行时、中文 README 和许可证；`DEVICE_TOKEN=AUTO` 会生成并保存便于九宫格输入的 12 位纯数字令牌。整个解压目录可移动到任意位置，但不能只复制 BAT。
 
 ## 暴露的接口
 
@@ -78,7 +78,7 @@ node .\gateway\server.js
 - API Key：填写 DEVICE_TOKEN，而不是真实服务商密钥
 - 模型：UPSTREAM_MODEL 留空时由手机档案决定；设置后以网关值为准
 
-v0.2 的预设档案若改用网关，应同时把聊天端点和模型端点指向上述两个地址。先在手机浏览器访问 /health 可以检查 IP、端口和防火墙；健康检查不代表服务商密钥一定有效。
+v0.3 的预设档案若改用网关，应同时把聊天端点和模型端点指向上述两个地址。先在手机浏览器访问 /health 可以检查 IP、端口和防火墙；健康检查不代表服务商密钥一定有效。
 
 ## 安全边界
 
@@ -103,7 +103,7 @@ node .\gateway\self-test.js
 - 未授权聊天和模型请求返回 401；
 - 授权 GET /v1/models 的路径推导、上游 Authorization、状态与 Content-Type 转发；
 - POST /v1/chat/completions 的模型覆盖和 SSE 流式响应；
-- 两类请求的 J2ME-LLM-Gateway/0.2.0 User-Agent；
+- 两类请求的 J2ME-LLM-Gateway/0.3.0 User-Agent；
 - 生产配置拒绝 HTTP 上游，并拒绝无法推导的模型路径。
 
 ## 常见问题

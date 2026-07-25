@@ -3,7 +3,7 @@ Set-StrictMode -Version 2.0
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $nodeVersion = '24.14.0'
-$packageVersion = '0.2.0'
+$packageVersion = '0.3.0'
 $nodeArchiveName = 'node-v' + $nodeVersion + '-win-x64.zip'
 $downloadRoot = Join-Path $projectRoot '.tools\downloads'
 $nodeArchive = Join-Path $downloadRoot $nodeArchiveName
@@ -112,4 +112,3 @@ $file = Get-Item -LiteralPath $outputZip
 Write-Output ('Gateway package: ' + $file.FullName)
 Write-Output ('Bytes: ' + $file.Length)
 Write-Output ('SHA256: ' + (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash)
-

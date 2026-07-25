@@ -1,5 +1,7 @@
 package com.chihoko.j2mellm.ui;
 
+import com.chihoko.j2mellm.i18n.I18n;
+import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.model.ProfileState;
 import com.chihoko.j2mellm.model.ProviderProfile;
 
@@ -11,17 +13,17 @@ import javax.microedition.lcdui.List;
 
 /** Selects one of the independently persisted provider profiles. */
 public final class ProfileListScreen extends List {
-    public final Command settingsCommand = new Command("设置", Command.SCREEN, 1);
-    public final Command modelsCommand = new Command("模型列表", Command.SCREEN, 2);
-    public final Command importCommand = new Command("导入配置", Command.SCREEN, 3);
-    public final Command exportCommand = new Command("导出配置", Command.SCREEN, 4);
-    public final Command backCommand = new Command("返回", Command.BACK, 5);
+    public final Command settingsCommand = new Command(I18n.text(TextId.SETTINGS), Command.SCREEN, 1);
+    public final Command modelsCommand = new Command(I18n.text(TextId.MODELS), Command.SCREEN, 2);
+    public final Command importCommand = new Command(I18n.text(TextId.IMPORT_CONFIG), Command.SCREEN, 3);
+    public final Command exportCommand = new Command(I18n.text(TextId.EXPORT_CONFIG), Command.SCREEN, 4);
+    public final Command backCommand = new Command(I18n.text(TextId.BACK), Command.BACK, 5);
 
     private final ProfileState state;
     private final Vector displayedProfileIds = new Vector();
 
     public ProfileListScreen(ProfileState profileState, CommandListener listener) {
-        super("模型档案", List.IMPLICIT);
+        super(I18n.text(TextId.PROFILE_LIST), List.IMPLICIT);
         state = profileState;
         addCommand(settingsCommand);
         addCommand(modelsCommand);
@@ -48,7 +50,7 @@ public final class ProfileListScreen extends List {
             if (profile.id.equals(wanted)) selected = i;
         }
         if (displayedProfileIds.size() == 0) {
-            append("没有可用档案", null);
+            append(I18n.text(TextId.NO_AVAILABLE_PROFILES), null);
         } else {
             if (selected < 0) selected = 0;
             setSelectedIndex(selected, true);
@@ -69,12 +71,13 @@ public final class ProfileListScreen extends List {
     private String label(ProviderProfile profile) {
         StringBuffer label = new StringBuffer();
         label.append(profile.id.equals(state.activeProfileId) ? "* " : "  ");
-        label.append(profile.displayName());
+        String displayName = I18n.profileName(profile);
+        label.append(displayName);
         String model = profile.model == null ? "" : profile.model.trim();
-        if (model.length() > 0 && !model.equals(profile.displayName())) {
+        if (model.length() > 0 && !model.equals(displayName)) {
             label.append("  [").append(model).append(']');
         }
-        if (!profile.isReady()) label.append("  (未配置)");
+        if (!profile.isReady()) label.append(I18n.text(TextId.NOT_CONFIGURED_SUFFIX));
         return label.toString();
     }
 }
