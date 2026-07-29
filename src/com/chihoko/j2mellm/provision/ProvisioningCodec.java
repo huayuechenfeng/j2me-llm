@@ -2,6 +2,8 @@
 package com.chihoko.j2mellm.provision;
 
 import com.chihoko.j2mellm.model.ProviderProfile;
+import com.chihoko.j2mellm.model.SearchConfig;
+import com.chihoko.j2mellm.model.SearchPresets;
 import com.chihoko.j2mellm.util.Base64;
 import com.chihoko.j2mellm.util.Crc32;
 import com.chihoko.j2mellm.util.Json;
@@ -73,6 +75,10 @@ public final class ProvisioningCodec {
         for (i = 0; i < profiles.size(); i++) {
             result.addProfile(readProfile(requireObject(profiles.elementAt(i), "档案必须是对象")));
         }
+        Object search = root.get("search");
+        if (search != null) {
+            result.setSearchConfig(readSearch(requireObject(search, "搜索配置必须是对象")));
+        }
         validatePackage(result);
         return result;
     }
@@ -88,7 +94,13 @@ public final class ProvisioningCodec {
             if (i > 0) out.append(',');
             appendProfile(out, (ProvisioningProfile) profiles.elementAt(i));
         }
-        out.append(']').append('}');
+        out.append(']');
+        if (config.hasSearchConfig()) {
+            out.append(',');
+            out.append(Json.quote("search")).append(':');
+            appendSearch(out, config.getSearchConfig());
+        }
+        out.append('}');
         return out.toString();
     }
 
@@ -109,6 +121,16 @@ public final class ProvisioningCodec {
         field(out, "reasoningEffort", profile.reasoningEffort); out.append(',');
         booleanField(out, "multimodal", profile.multimodal); out.append(',');
         booleanField(out, "endpointOverridden", profile.endpointOverridden);
+        out.append('}');
+    }
+
+    private static void appendSearch(StringBuffer out, SearchConfig search) {
+        out.append('{');
+        booleanField(out, "enabled", search.enabled); out.append(',');
+        field(out, "preset", search.presetId); out.append(',');
+        field(out, "endpoint", search.endpoint); out.append(',');
+        field(out, "apiKey", search.apiKey); out.append(',');
+        numberField(out, "maximumResults", search.maximumResults);
         out.append('}');
     }
 
@@ -133,6 +155,17 @@ public final class ProvisioningCodec {
         return profile;
     }
 
+    private static SearchConfig readSearch(Hashtable source) throws IOException {
+        SearchConfig search = new SearchConfig();
+        search.enabled = bool(source, "enabled", false);
+        search.presetId = text(source, "preset", false);
+        if (search.presetId.length() == 0) search.presetId = SearchConfig.FREE_COMPOSITE;
+        search.endpoint = text(source, "endpoint", false);
+        search.apiKey = text(source, "apiKey", false);
+        search.maximumResults = integer(source, "maximumResults", 5);
+        return search;
+    }
+
     private static void validatePackage(ProvisioningPackage config) throws IOException {
         Vector profiles = config.getProfiles();
         if (profiles.size() == 0) throw new IOException("配置包至少需要一个档案");
@@ -155,8 +188,8 @@ public final class ProvisioningCodec {
             bounded(profile.model, ProviderProfile.MAX_MODEL_CHARS, "模型名称");
             bounded(profile.systemPrompt, ProviderProfile.MAX_SYSTEM_PROMPT_CHARS, "系统提示词");
             bounded(profile.reasoningEffort, ProviderProfile.MAX_EFFORT_CHARS, "思考强度");
-            if (profile.historyMessages < 2 || profile.historyMessages > 24) {
-                throw new IOException("历史消息数必须在 2 到 24 之间");
+            if (profile.historyMessages < 2 || profile.historyMessages > 256) {
+                throw new IOException("历史消息数必须在 2 到 256 之间");
             }
             if (profile.thinkingMode < 0 || profile.thinkingMode > 2) {
                 throw new IOException("思考模式值无效");
@@ -168,6 +201,37 @@ public final class ProvisioningCodec {
         if (config.getActiveProfileId().length() > 0 && ids.get(config.getActiveProfileId()) == null) {
             throw new IOException("活动档案不存在");
         }
+        if (config.hasSearchConfig()) validateSearch(config.getSearchConfig());
+    }
+
+    private static void validateSearch(SearchConfig search) throws IOException {
+        if (search == null) throw new IOException("搜索配置为空");
+        if (search.presetId == null || search.presetId.length() == 0) {
+            search.presetId = SearchConfig.FREE_COMPOSITE;
+        }
+        if (search.endpoint == null) search.endpoint = "";
+        if (search.apiKey == null) search.apiKey = "";
+        boundedRequired(search.presetId, SearchConfig.MAX_PRESET_CHARS, "搜索预设标识");
+        if (!SearchConfig.isPreset(search.presetId)) {
+            throw new IOException("搜索预设不受支持");
+        }
+        bounded(search.endpoint, SearchConfig.MAX_ENDPOINT_CHARS, "搜索端点");
+        bounded(search.apiKey, SearchConfig.MAX_API_KEY_CHARS, "搜索 API 密钥");
+        if (search.maximumResults < 1 || search.maximumResults > 10) {
+            throw new IOException("搜索结果数必须在 1 到 10 之间");
+        }
+        String effectiveEndpoint = search.endpoint.length() == 0
+                ? SearchPresets.defaultEndpoint(search.presetId) : search.endpoint;
+        if (search.enabled && !startsWithHttp(effectiveEndpoint)) {
+            throw new IOException("已启用搜索但端点无效");
+        }
+        if (search.enabled && search.requiresKey() && search.apiKey.length() == 0) {
+            throw new IOException("搜索预设需要 API 密钥");
+        }
+    }
+
+    private static boolean startsWithHttp(String value) {
+        return value != null && (value.startsWith("http://") || value.startsWith("https://"));
     }
 
     private static void normalize(ProvisioningProfile profile) {
@@ -242,5 +306,3 @@ public final class ProvisioningCodec {
         if (value != null && value.length() > limit) throw new IOException(label + "过长");
     }
 }
-
-

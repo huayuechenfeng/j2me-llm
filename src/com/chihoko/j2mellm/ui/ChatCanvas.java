@@ -21,16 +21,24 @@ public final class ChatCanvas extends Canvas {
             I18n.text(TextId.COMPOSE), Command.OK, 1);
     public final Command imageCommand = new Command(
             I18n.text(TextId.IMAGE), Command.SCREEN, 2);
+    public final Command conversationsCommand = new Command(
+            I18n.text(TextId.CONVERSATIONS), Command.SCREEN, 3);
+    public final Command messagesCommand = new Command(
+            I18n.text(TextId.MESSAGE_LIST), Command.SCREEN, 4);
     public final Command profilesCommand = new Command(
-            I18n.text(TextId.PROFILES), Command.SCREEN, 3);
+            I18n.text(TextId.PROFILES), Command.SCREEN, 5);
     public final Command settingsCommand = new Command(
-            I18n.text(TextId.SETTINGS), Command.SCREEN, 4);
+            I18n.text(TextId.SETTINGS), Command.SCREEN, 6);
+    public final Command searchSettingsCommand = new Command(
+            I18n.text(TextId.SEARCH_SETTINGS), Command.SCREEN, 7);
+    public final Command limitsCommand = new Command(
+            I18n.text(TextId.LIMITS), Command.SCREEN, 8);
     public final Command languageCommand = new Command(
-            I18n.text(TextId.LANGUAGE), Command.SCREEN, 5);
+            I18n.text(TextId.LANGUAGE), Command.SCREEN, 9);
     public final Command thinkingCommand = new Command(
-            I18n.text(TextId.REASONING), Command.SCREEN, 6);
+            I18n.text(TextId.REASONING), Command.SCREEN, 10);
     public final Command clearCommand = new Command(
-            I18n.text(TextId.CLEAR), Command.SCREEN, 7);
+            I18n.text(TextId.CLEAR), Command.SCREEN, 11);
     public final Command stopCommand = new Command(
             I18n.text(TextId.STOP), Command.STOP, 1);
     public final Command exitCommand = new Command(
@@ -48,7 +56,7 @@ public final class ChatCanvas extends Canvas {
     private static final int COLOR_TOOLBAR_PRESSED = 0x6554c0;
     private static final int REPAINT_INTERVAL_MS = 100;
     private static final int DRAG_THRESHOLD = 4;
-    private static final int MORE_ITEM_COUNT = 6;
+    private static final int MORE_ITEM_COUNT = 10;
 
     private Vector messages;
     private ProviderProfile profile;
@@ -77,8 +85,12 @@ public final class ChatCanvas extends Canvas {
         touchEnabled = hasPointerEvents();
         showReasoning = initialProfile != null && initialProfile.reasoningExpanded;
         setFullScreenMode(touchEnabled);
+        addCommand(conversationsCommand);
+        addCommand(messagesCommand);
         addCommand(profilesCommand);
         addCommand(settingsCommand);
+        addCommand(searchSettingsCommand);
+        addCommand(limitsCommand);
         addCommand(languageCommand);
         addCommand(thinkingCommand);
         addCommand(clearCommand);
@@ -395,6 +407,13 @@ public final class ChatCanvas extends Canvas {
                 textX, cursorY + 3, normal);
         cursorY += 5;
 
+        if (layout.sourceLabel.length() > 0) {
+            graphics.setColor(user ? 0xded8ff : COLOR_MUTED);
+            graphics.drawString(layout.sourceLabel, textX, cursorY,
+                    Graphics.TOP | Graphics.LEFT);
+            cursorY += normal.getHeight() + 2;
+        }
+
         if (message.hasMedia()) {
             graphics.setColor(user ? 0xded8ff : COLOR_MUTED);
             String label = message.getImageName().length() > 0
@@ -502,22 +521,30 @@ public final class ChatCanvas extends Canvas {
 
     private Command moreCommand(int row) {
         switch (row) {
-            case 0: return profilesCommand;
-            case 1: return settingsCommand;
-            case 2: return languageCommand;
-            case 3: return thinkingCommand;
-            case 4: return clearCommand;
+            case 0: return conversationsCommand;
+            case 1: return messagesCommand;
+            case 2: return profilesCommand;
+            case 3: return settingsCommand;
+            case 4: return searchSettingsCommand;
+            case 5: return limitsCommand;
+            case 6: return languageCommand;
+            case 7: return thinkingCommand;
+            case 8: return clearCommand;
             default: return exitCommand;
         }
     }
 
     private String moreLabel(int row) {
         switch (row) {
-            case 0: return I18n.text(TextId.PROFILES);
-            case 1: return I18n.text(TextId.SETTINGS);
-            case 2: return I18n.text(TextId.LANGUAGE);
-            case 3: return I18n.text(TextId.REASONING);
-            case 4: return I18n.text(TextId.CLEAR);
+            case 0: return I18n.text(TextId.CONVERSATIONS);
+            case 1: return I18n.text(TextId.MESSAGE_LIST);
+            case 2: return I18n.text(TextId.PROFILES);
+            case 3: return I18n.text(TextId.SETTINGS);
+            case 4: return I18n.text(TextId.SEARCH_SETTINGS);
+            case 5: return I18n.text(TextId.LIMITS);
+            case 6: return I18n.text(TextId.LANGUAGE);
+            case 7: return I18n.text(TextId.REASONING);
+            case 8: return I18n.text(TextId.CLEAR);
             default: return I18n.text(TextId.EXIT);
         }
     }
@@ -610,6 +637,7 @@ public final class ChatCanvas extends Canvas {
         final boolean hasReasoning;
         final String reasoning;
         final String status;
+        final String sourceLabel;
         final LineMap contentLines;
         final LineMap reasonLines;
         final LineMap statusLines;
@@ -631,6 +659,9 @@ public final class ChatCanvas extends Canvas {
             hasReasoning = value.hasReasoning();
             reasoning = showReasoning && hasReasoning ? value.getReasoning() : "";
             status = value.getImageStatus();
+            sourceLabel = value.getSearchBundle() == null ? ""
+                    : I18n.text(TextId.SEARCH_SOURCES) + ": "
+                    + value.getSearchBundle().results.size();
             contentLines = new LineMap(content, normal, textWidth);
             reasonLines = showReasoning && hasReasoning
                     ? new LineMap(reasoning, normal, textWidth - 8) : null;
@@ -642,6 +673,7 @@ public final class ChatCanvas extends Canvas {
                 if (showReasoning) measured += reasonLines.count * normal.getHeight() + 4;
             }
             measured += contentLines.count * normal.getHeight() + 8;
+            if (sourceLabel.length() > 0) measured += normal.getHeight() + 2;
             if (value.hasMedia()) {
                 measured += normal.getHeight() + 4;
                 Image image = value.getImagePreview();

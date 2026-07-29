@@ -1,12 +1,14 @@
-# J2ME LLM v0.3 HTTPS 兼容网关
+# J2ME LLM v0.4 HTTPS 兼容网关
 
 这个零依赖的 Node.js 18+ 网关用于解决老式 J2ME 手机无法协商现代 HTTPS/TLS 的问题。手机只连接受信任局域网中的 HTTP 网关，网关再通过现代 HTTPS 访问 LLM 服务商。真实服务商密钥只保存在网关电脑上，不需要写入手机。
 
-v0.3 网关同时代理聊天和模型目录，因此 MIDlet 的“获取模型”功能在索爱 W995 等旧设备上也可以通过网关工作。
+v0.4 网关同时代理聊天、模型目录和联网搜索，因此 MIDlet 的“获取模型”和“搜索并发送”在索爱 W995 等旧 TLS 设备上也可以通过网关工作。
+
+> 联网搜索仍为测试功能，服务可用性、结果质量和兼容性可能不稳定或不完善。免费无密钥模式仅作为兜底；推荐配置带 API Key 的搜索服务，并使用 Release 中的离线配置工具生成 `.j2cfg` 后导入手机端。
 
 ## 独立一键包
 
-普通用户无需安装 Node.js，也无需下载项目源码。下载并解压 [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Gateway-v0.3.0-windows-x64.zip)，编辑 `gateway.conf` 后双击“启动网关.bat”即可。压缩包内置经过官方校验的 Node.js v24.14.0 运行时、中文 README 和许可证；`DEVICE_TOKEN=AUTO` 会生成并保存便于九宫格输入的 12 位纯数字令牌。整个解压目录可移动到任意位置，但不能只复制 BAT。
+普通用户无需安装 Node.js。v0.4 发布时下载并解压 Windows x64 独立网关 ZIP，编辑 `gateway.conf` 后双击“启动网关.bat”即可；开发者也可运行 `tools/build-gateway-package.ps1` 生成当前包。压缩包内置经过官方校验的 Node.js v24.14.0 运行时、中文 README 和许可证；`DEVICE_TOKEN=AUTO` 会生成并保存便于九宫格输入的 12 位纯数字令牌。整个解压目录可移动到任意位置，但不能只复制 BAT。
 
 ## 暴露的接口
 
@@ -15,6 +17,7 @@ v0.3 网关同时代理聊天和模型目录，因此 MIDlet 的“获取模型�
 | GET /health | 否 | 局域网连通性检查，不包含配置或密钥 |
 | POST /v1/chat/completions | 是 | 转发 OpenAI 兼容聊天请求和流式响应 |
 | GET /v1/models | 是 | 转发 OpenAI 兼容模型列表 |
+| GET /v1/search?q=...&count=5 | 是 | 调用已配置的搜索服务并返回统一结果 |
 
 聊天和模型接口都要求请求头 Authorization: Bearer DEVICE_TOKEN。网关会把这个设备令牌替换为真正的 UPSTREAM_API_KEY，再请求上游。上游状态码、Content-Type 和可用的 x-request-id 会保留，响应正文按流转发，不会先完整缓存在内存中。
 
@@ -37,10 +40,15 @@ v0.3 网关同时代理聊天和模型目录，因此 MIDlet 的“获取模型�
 | UPSTREAM_MODELS_URL | 否 | 模型目录地址；留空时从 UPSTREAM_URL 自动推导 |
 | UPSTREAM_API_KEY | 是 | 服务商真实密钥，只保存在网关电脑 |
 | UPSTREAM_MODEL | 否 | 设置后强制覆盖手机请求中的模型；留空则使用手机所选模型 |
+| SEARCH_PROVIDER | 否 | `free`（默认）、`searxng`、`brave`、`tavily`、`exa` 或 `custom`；也接受客户端名称 `free-composite`、`public-searxng` |
+| UPSTREAM_SEARCH_URL | 否 | 搜索端点模板；可使用 `{query}` 和 `{count}`，留空时按预设生成 |
+| UPSTREAM_SEARCH_API_KEY | 付费搜索必填 | 搜索服务密钥，只保存在网关电脑 |
 | DEVICE_TOKEN | 是 | 手机使用的网关令牌，至少 12 个字符，建议随机生成 32 字符以上 |
 | LOG_ERRORS | 否 | 设为 1 时输出精简错误；已知密钥和设备令牌会被脱敏 |
 
 自动推导只接受以 /chat/completions 或 /chat/completions/ 结尾的聊天路径，并将最后一段替换成 /models。域名、前缀路径和查询参数会保留。若服务商采用其他路由，必须显式填写 UPSTREAM_MODELS_URL；启动阶段会尽早报错，避免悄悄请求错误地址。
+
+独立包的启动器会把 `gateway.conf` 路径直接交给网关进程，不再只依赖 BAT 继承环境变量。旧配置缺少搜索字段时，启动器会自动补入免费预设。修改配置后需要重启；`/health` 返回的 `searchProvider` 是本次实际生效的规范化名称。切换预设并希望使用其默认端点时，应把 `UPSTREAM_SEARCH_URL` 留空；非空值始终优先。
 
 所有上游地址必须使用 HTTPS。生产环境没有允许 HTTP 上游的环境变量，程序化的 allowInsecureUpstream 只供本地自测创建临时 HTTP 服务器使用。上游重定向也会被拒绝，避免携带密钥降级到 HTTP。
 
@@ -75,10 +83,11 @@ node .\gateway\server.js
 
 - 聊天端点：http://192.168.1.20:8787/v1/chat/completions
 - 模型端点：http://192.168.1.20:8787/v1/models
+- 搜索端点：http://192.168.1.20:8787/v1/search?q={query}&count={count}
 - API Key：填写 DEVICE_TOKEN，而不是真实服务商密钥
 - 模型：UPSTREAM_MODEL 留空时由手机档案决定；设置后以网关值为准
 
-v0.3 的预设档案若改用网关，应同时把聊天端点和模型端点指向上述两个地址。先在手机浏览器访问 /health 可以检查 IP、端口和防火墙；健康检查不代表服务商密钥一定有效。
+聊天预设若改用网关，应同时设置聊天和模型端点。搜索设置选择“自定义 JSON API”，填写上述搜索端点，API Key 同样填写 `DEVICE_TOKEN`。先在手机浏览器访问 `/health` 检查 IP、端口、防火墙和 `searchProvider`；健康检查不代表搜索上游密钥一定有效。
 
 ## 安全边界
 
@@ -103,7 +112,8 @@ node .\gateway\self-test.js
 - 未授权聊天和模型请求返回 401；
 - 授权 GET /v1/models 的路径推导、上游 Authorization、状态与 Content-Type 转发；
 - POST /v1/chat/completions 的模型覆盖和 SSE 流式响应；
-- 两类请求的 J2ME-LLM-Gateway/0.3.0 User-Agent；
+- 三类请求的 J2ME-LLM-Gateway/0.4.0 User-Agent；
+- 授权搜索代理、查询参数转发和统一结果结构；
 - 生产配置拒绝 HTTP 上游，并拒绝无法推导的模型路径。
 
 ## 常见问题

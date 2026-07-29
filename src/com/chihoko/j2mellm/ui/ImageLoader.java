@@ -2,6 +2,7 @@ package com.chihoko.j2mellm.ui;
 
 import com.chihoko.j2mellm.i18n.I18n;
 import com.chihoko.j2mellm.i18n.TextId;
+import com.chihoko.j2mellm.model.ResourceLimits;
 import com.chihoko.j2mellm.util.Base64;
 import com.chihoko.j2mellm.util.ImageDimensions;
 
@@ -14,12 +15,23 @@ import javax.microedition.io.HttpConnection;
 import javax.microedition.lcdui.Image;
 
 public final class ImageLoader implements Runnable {
-    private static final int MAX_DOWNLOAD_BYTES = 262144;
-    private static final int MAX_PREVIEW_PIXELS = 65536;
+    private int maximumDownloadBytes = 262144;
+    private int maximumPreviewPixels = 65536;
     private String source;
     private int width;
     private int height;
     private ImageLoadListener listener;
+
+    public ImageLoader() {
+    }
+
+    public ImageLoader(ResourceLimits limits) {
+        if (limits != null) {
+            limits.normalize();
+            maximumDownloadBytes = limits.maximumReturnedImageBytes;
+            maximumPreviewPixels = limits.maximumImagePixels;
+        }
+    }
 
     public void load(String value, int maximumWidth, int maximumHeight, ImageLoadListener callback) {
         source = value;
@@ -36,7 +48,7 @@ public final class ImageLoader implements Runnable {
             if (dimensions == null) {
                 throw new IOException(I18n.text(TextId.IMAGE_DIMENSIONS_UNSAFE));
             }
-            if (!dimensions.fitsPixelLimit(MAX_PREVIEW_PIXELS)) {
+            if (!dimensions.fitsPixelLimit(maximumPreviewPixels)) {
                 throw new IOException(I18n.text(TextId.IMAGE_PIXELS_PREVIEW_SKIPPED));
             }
             ensureDecodeMemory(data.length, dimensions.pixelCountOrMaximum());
@@ -58,11 +70,11 @@ public final class ImageLoader implements Runnable {
                 throw new IOException(I18n.text(TextId.IMAGE_DATA_URL_UNSUPPORTED));
             }
             String encoded = source.substring(comma + 1);
-            if (encoded.length() > ((MAX_DOWNLOAD_BYTES * 4) / 3) + 8) {
+            if (encoded.length() > ((maximumDownloadBytes * 4) / 3) + 8) {
                 throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
             }
             byte[] decoded = Base64.decode(encoded);
-            if (decoded.length > MAX_DOWNLOAD_BYTES) {
+            if (decoded.length > maximumDownloadBytes) {
                 throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
             }
             return decoded;
@@ -81,17 +93,17 @@ public final class ImageLoader implements Runnable {
             int status = connection.getResponseCode();
             if (status < 200 || status >= 300) throw new IOException("Image HTTP " + status);
             long declared = connection.getLength();
-            if (declared > MAX_DOWNLOAD_BYTES) {
+            if (declared > maximumDownloadBytes) {
                 throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
             }
             input = connection.openInputStream();
-            ByteArrayOutputStream output = new ByteArrayOutputStream(
-                    declared > 0 ? (int) declared : 4096);
+            if (declared > 0) return readKnownSize(input, (int) declared);
+            ByteArrayOutputStream output = new ByteArrayOutputStream(4096);
             byte[] buffer = new byte[1024];
             int count;
             while ((count = input.read(buffer)) >= 0) {
                 if (count == 0) continue;
-                if (output.size() + count > MAX_DOWNLOAD_BYTES) {
+                if (output.size() + count > maximumDownloadBytes) {
                     throw new IOException(I18n.text(TextId.RETURNED_IMAGE_TOO_LARGE));
                 }
                 output.write(buffer, 0, count);
@@ -103,9 +115,25 @@ public final class ImageLoader implements Runnable {
         }
     }
 
+    private byte[] readKnownSize(InputStream input, int size) throws IOException {
+        byte[] data;
+        try {
+            data = new byte[size];
+        } catch (OutOfMemoryError failure) {
+            throw new IOException(I18n.text(TextId.IMAGE_PREVIEW_LOW_MEMORY));
+        }
+        int offset = 0;
+        while (offset < size) {
+            int count = input.read(data, offset, size - offset);
+            if (count < 0) throw new IOException(I18n.text(TextId.IMAGE_READ_INCOMPLETE));
+            if (count > 0) offset += count;
+        }
+        return data;
+    }
+
     private void ensureDecodeMemory(int encodedBytes, int pixels) throws IOException {
         long free = Runtime.getRuntime().freeMemory();
-        long reserve = (long) encodedBytes + ((long) pixels * 4L) + 65536L;
+        long reserve = (long) encodedBytes + ((long) pixels * 8L) + 262144L;
         if (free > 0 && free < reserve) {
             throw new IOException(I18n.text(TextId.IMAGE_PREVIEW_LOW_MEMORY));
         }

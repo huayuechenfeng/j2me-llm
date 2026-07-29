@@ -6,6 +6,7 @@ import com.chihoko.j2mellm.i18n.I18n;
 import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.model.ProviderPresets;
 import com.chihoko.j2mellm.model.ProviderProfile;
+import com.chihoko.j2mellm.model.ResourceLimits;
 
 import javax.microedition.lcdui.ChoiceGroup;
 import javax.microedition.lcdui.Command;
@@ -14,7 +15,7 @@ import javax.microedition.lcdui.Form;
 import javax.microedition.lcdui.StringItem;
 import javax.microedition.lcdui.TextField;
 
-/** Edits one provider profile without changing its independent chat history. */
+/** Edits the provider profile used by the active conversation. */
 public final class SettingsForm extends Form {
     private static final String[] EFFORT_LABELS = {
             "minimal", "low", "medium", "high", "xhigh", "max"
@@ -41,9 +42,12 @@ public final class SettingsForm extends Form {
     private final boolean customProfile;
     private final String originalName;
     private final String displayedName;
+    private final int maximumHistory;
 
-    public SettingsForm(ProviderProfile profile, CommandListener listener) {
+    public SettingsForm(ProviderProfile profile, ResourceLimits limits,
+            CommandListener listener) {
         super(I18n.text(TextId.PROFILE_SETTINGS_PREFIX) + I18n.profileName(profile));
+        maximumHistory = limits == null ? 64 : limits.activeMessages;
         customProfile = ProviderPresets.CUSTOM.equals(profile.presetId);
         originalName = safe(profile.name);
         displayedName = I18n.profileName(profile);
@@ -111,7 +115,7 @@ public final class SettingsForm extends Form {
                 new String[] {I18n.text(TextId.ALLOW_IMAGES)}, null);
         multimodalChoice.setSelectedIndex(0, profile.multimodal);
         historyField = new TextField(I18n.text(TextId.HISTORY_MESSAGES),
-                Integer.toString(profile.historyMessages), 2, TextField.NUMERIC);
+                Integer.toString(profile.historyMessages), 3, TextField.NUMERIC);
 
         append(nameField);
         append(endpointOverrideChoice);
@@ -190,7 +194,7 @@ public final class SettingsForm extends Form {
         } catch (NumberFormatException ignored) {
         }
         if (history < 2) history = 2;
-        if (history > 24) history = 24;
+        if (history > maximumHistory) history = maximumHistory;
         profile.historyMessages = history;
     }
 
@@ -221,5 +225,3 @@ public final class SettingsForm extends Form {
         return value == null ? "" : value;
     }
 }
-
-

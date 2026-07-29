@@ -3,6 +3,7 @@ package com.chihoko.j2mellm.ui;
 import com.chihoko.j2mellm.i18n.I18n;
 import com.chihoko.j2mellm.i18n.TextId;
 import com.chihoko.j2mellm.model.ImageAttachment;
+import com.chihoko.j2mellm.model.ResourceLimits;
 import com.chihoko.j2mellm.util.ImageDimensions;
 
 import java.io.ByteArrayOutputStream;
@@ -21,9 +22,9 @@ import javax.microedition.lcdui.Displayable;
 import javax.microedition.lcdui.List;
 
 public final class ImagePicker implements ImagePickerController, CommandListener {
-    private static final int MAX_IMAGE_BYTES = 98304;
-    private static final int MAX_PREVIEW_PIXELS = 65536;
     private static final int MAX_ENTRIES = 256;
+    private int maximumImageBytes = 98304;
+    private int maximumImagePixels = 65536;
     private final Command backCommand = new Command(
             I18n.text(TextId.BACK), Command.BACK, 2);
     private final Command upCommand = new Command(I18n.text(TextId.UP), Command.BACK, 1);
@@ -33,6 +34,13 @@ public final class ImagePicker implements ImagePickerController, CommandListener
     private List list;
     private Vector urls;
     private String currentUrl;
+
+    public void configureLimits(ResourceLimits limits) {
+        if (limits == null) return;
+        limits.normalize();
+        maximumImageBytes = limits.maximumInputImageBytes;
+        maximumImagePixels = limits.maximumImagePixels;
+    }
 
     public void open(Display targetDisplay, Displayable backScreen, ImagePickListener callback) {
         display = targetDisplay;
@@ -142,7 +150,7 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         try {
             file = (FileConnection) Connector.open(url, Connector.READ);
             long size = file.fileSize();
-            if (size > MAX_IMAGE_BYTES) {
+            if (size > maximumImageBytes) {
                 throw new IOException(I18n.text(TextId.IMAGE_TOO_LARGE));
             }
             ensureMemory(size);
@@ -152,10 +160,9 @@ public final class ImagePicker implements ImagePickerController, CommandListener
             if (dimensions == null) {
                 throw new IOException(I18n.text(TextId.IMAGE_DIMENSIONS_UNKNOWN));
             }
-            if (!dimensions.fitsPixelLimit(MAX_PREVIEW_PIXELS)) {
+            if (!dimensions.fitsPixelLimit(maximumImagePixels)) {
                 throw new IOException(I18n.text(TextId.IMAGE_PIXELS_TOO_LARGE));
             }
-            ensurePreviewMemory(data.length, dimensions.pixelCountOrMaximum());
             String name = file.getName();
             ImageAttachment attachment = new ImageAttachment(name, mime(dimensions), data);
             display.setCurrent(back);
@@ -191,7 +198,7 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         int count;
         while ((count = input.read(buffer)) >= 0) {
             if (count == 0) continue;
-            if (output.size() + count > MAX_IMAGE_BYTES) {
+            if (output.size() + count > maximumImageBytes) {
                 throw new IOException(I18n.text(TextId.IMAGE_TOO_LARGE));
             }
             output.write(buffer, 0, count);
@@ -203,14 +210,6 @@ public final class ImagePicker implements ImagePickerController, CommandListener
         if (size <= 0) return;
         long free = Runtime.getRuntime().freeMemory();
         long reserve = size * 3L + 65536L;
-        if (free > 0 && free < reserve) {
-            throw new IOException(I18n.text(TextId.CHOOSE_SMALLER_IMAGE));
-        }
-    }
-
-    private void ensurePreviewMemory(int encodedBytes, int pixels) throws IOException {
-        long free = Runtime.getRuntime().freeMemory();
-        long reserve = (long) encodedBytes + ((long) pixels * 4L) + 65536L;
         if (free > 0 && free < reserve) {
             throw new IOException(I18n.text(TextId.CHOOSE_SMALLER_IMAGE));
         }

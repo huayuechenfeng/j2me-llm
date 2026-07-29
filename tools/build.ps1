@@ -23,14 +23,16 @@ $rawJar = Join-Path $rawRoot 'J2ME-LLM-raw.jar'
 $finalJar = Join-Path $distRoot 'J2ME-LLM.jar'
 $finalJad = Join-Path $distRoot 'J2ME-LLM.jad'
 $manifest = Join-Path $projectRoot 'config\manifest.mf'
+$provisioner = Join-Path $projectRoot 'provisioner\index.html'
+$finalProvisioner = Join-Path $distRoot 'J2ME-LLM-Config-Generator-v0.4.0.html'
 
-foreach ($required in @($ecj, $cldc, $midp, $jsr75, $proguard, $manifest)) {
+foreach ($required in @($ecj, $cldc, $midp, $jsr75, $proguard, $manifest, $provisioner)) {
     if (-not (Test-Path -LiteralPath $required)) {
         throw "Missing build dependency: $required`nRun tools\bootstrap.ps1 first."
     }
 }
 
-foreach ($target in @($classRoot, $testRoot, $rawRoot, $distRoot)) {
+foreach ($target in @($classRoot, $testRoot, $rawRoot)) {
     $fullTarget = [System.IO.Path]::GetFullPath($target)
     $fullRoot = [System.IO.Path]::GetFullPath($projectRoot) + [System.IO.Path]::DirectorySeparatorChar
     if (-not $fullTarget.StartsWith($fullRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -38,6 +40,14 @@ foreach ($target in @($classRoot, $testRoot, $rawRoot, $distRoot)) {
     }
     if (Test-Path -LiteralPath $fullTarget) { Remove-Item -LiteralPath $fullTarget -Recurse -Force }
     New-Item -ItemType Directory -Path $fullTarget | Out-Null
+}
+if (-not (Test-Path -LiteralPath $distRoot)) {
+    New-Item -ItemType Directory -Path $distRoot | Out-Null
+}
+foreach ($output in @($finalJar, $finalJad, $finalProvisioner)) {
+    if (Test-Path -LiteralPath $output) {
+        Remove-Item -LiteralPath $output -Force
+    }
 }
 
 Push-Location $projectRoot
@@ -53,6 +63,13 @@ try {
             'src\com\chihoko\j2mellm\util\JsonStreamWriter.java',
             'src\com\chihoko\j2mellm\model\ImageAttachment.java',
             'src\com\chihoko\j2mellm\model\MessageMedia.java',
+            'src\com\chihoko\j2mellm\model\SearchResult.java',
+            'src\com\chihoko\j2mellm\model\SearchBundle.java',
+            'src\com\chihoko\j2mellm\model\SearchConfig.java',
+            'src\com\chihoko\j2mellm\model\SearchPresets.java',
+            'src\com\chihoko\j2mellm\model\ResourceLimits.java',
+            'src\com\chihoko\j2mellm\model\ConversationMeta.java',
+            'src\com\chihoko\j2mellm\model\ConversationState.java',
             'src\com\chihoko\j2mellm\model\ChatMessage.java',
             'src\com\chihoko\j2mellm\model\ProviderProfile.java',
             'src\com\chihoko\j2mellm\model\ProviderPresets.java',
@@ -69,6 +86,10 @@ try {
             'src\com\chihoko\j2mellm\net\ChatRequestWriter.java',
             'src\com\chihoko\j2mellm\store\ProfileCodec.java',
             'src\com\chihoko\j2mellm\store\ConversationRecordValidator.java',
+            'src\com\chihoko\j2mellm\store\ConversationIndexCodec.java',
+            'src\com\chihoko\j2mellm\store\ConversationMessageCodec.java',
+            'src\com\chihoko\j2mellm\store\ResourceLimitsCodec.java',
+            'src\com\chihoko\j2mellm\store\SearchConfigCodec.java',
             'src\com\chihoko\j2mellm\store\LegacyConfigCodec.java',
             'src\com\chihoko\j2mellm\provision\ProvisioningProfile.java',
             'src\com\chihoko\j2mellm\provision\ProvisioningPackage.java',
@@ -88,6 +109,10 @@ try {
             'com.chihoko.j2mellm.net.ChatRequestWriterSelfTest',
             'com.chihoko.j2mellm.store.ProfileCodecSelfTest',
             'com.chihoko.j2mellm.store.ConversationRecordValidatorSelfTest',
+            'com.chihoko.j2mellm.store.ConversationIndexCodecSelfTest',
+            'com.chihoko.j2mellm.store.ConversationMessageCodecSelfTest',
+            'com.chihoko.j2mellm.store.ResourceLimitsCodecSelfTest',
+            'com.chihoko.j2mellm.store.SearchConfigCodecSelfTest',
             'com.chihoko.j2mellm.provision.ProvisioningCodecSelfTest',
             'com.chihoko.j2mellm.provision.ProvisioningMapperSelfTest',
             'com.chihoko.j2mellm.i18n.I18nSelfTest'
@@ -130,7 +155,7 @@ try {
     $jarSize = (Get-Item -LiteralPath $finalJar).Length
     $jadLines = @(
         'MIDlet-Name: J2ME LLM',
-        'MIDlet-Version: 0.3.0',
+        'MIDlet-Version: 0.4.0',
         'MIDlet-Vendor: Chihoko',
         'MIDlet-1: J2ME LLM,,com.chihoko.j2mellm.LlmMidlet',
         'Nokia-MIDlet-On-Screen-Keypad: no',
@@ -142,6 +167,7 @@ try {
         "MIDlet-Jar-Size: $jarSize"
     )
     [System.IO.File]::WriteAllLines($finalJad, $jadLines, (New-Object System.Text.UTF8Encoding($false)))
+    Copy-Item -LiteralPath $provisioner -Destination $finalProvisioner
 
     $entries = & jar tf $finalJar
     if ($LASTEXITCODE -ne 0 -or -not ($entries -contains 'com/chihoko/j2mellm/LlmMidlet.class')) {
@@ -149,11 +175,7 @@ try {
     }
     Write-Output "Build complete: $finalJar ($jarSize bytes)"
     Write-Output "Descriptor: $finalJad"
+    Write-Output "Offline configuration tool: $finalProvisioner"
 } finally {
     Pop-Location
 }
-
-
-
-
-

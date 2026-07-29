@@ -2,11 +2,25 @@
 
 [简体中文](README.md) | **English**
 
-J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. The current release is v0.3.0, adding a bilingual UI and full-screen touch toolbar to the profiles, model discovery, reasoning controls, memory-conscious networking, and offline configuration packages introduced in v0.2.0.
+J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. The current version is v0.4.0, adding multiple conversations, message edit/regenerate actions, web search, and unlockable resource limits.
 
-**Download v0.3.0:** [JAR installer](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jar) · [JAD descriptor](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jad) · [Offline configuration generator HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Config-Generator-v0.3.0.html) · [Standalone Windows x64 gateway ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Gateway-v0.3.0-windows-x64.zip) · [Release notes](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.3.0)
+**Download v0.4.0:** [JAR installer](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jar) · [JAD descriptor](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jad) · [Offline configuration generator HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Config-Generator-v0.4.0.html) · [Standalone Windows x64 gateway ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Gateway-v0.4.0-windows-x64.zip) · [Release notes](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.4.0)
 
-> **Project note:** v0.3.0 is the current public release; v0.2.0 was the first public release of J2ME LLM, while v0.1.0 was an unpublished development and W995 device-testing prototype. Chihoko defined the product direction and performed real-device validation, while design, implementation, testing, and documentation were completed through AI-assisted vibe coding.
+> **Project note:** v0.4.0 has completed real-device validation; v0.2.0 was the first public release, while v0.1.0 was an unpublished development and W995 device-testing prototype. Chihoko defined the product direction and performed real-device validation, while design, implementation, testing, and documentation were completed through AI-assisted vibe coding.
+
+## What's new in v0.4.0
+
+> **Web search remains an experimental feature.** Search availability, result quality, and network compatibility may be unstable or incomplete. The keyless free mode is a fallback only. A keyed provider such as Brave, Tavily, or Exa is recommended; configure it with the offline configuration generator bundled in the Release, generate a `.j2cfg` file, and import that file on the phone.
+
+- Open `Chats / New` to find an always-visible `+ New chat` first row, then create, switch, rename, or delete independently persisted conversations. Changing a provider profile no longer replaces the current history.
+- Edit and resend a user message or regenerate an answer from the selected turn.
+- Search + Send with keyless DuckDuckGo + Wikipedia and public SearXNG reference presets, plus Brave, Tavily, Exa, and custom JSON APIs.
+- Search results are bounded, persisted with the user turn, and injected as explicitly untrusted reference text.
+- Compatible, Recommended, and explicitly unlocked Custom context budgets. The recommended defaults are 131,072 active characters, 64 active/saved messages, and 96,000 request-context characters.
+- Compatible, High-performance, and Custom image budgets. High-performance mode allows 512 KiB / 1,048,576-pixel input and 1 MiB returned images while retaining free-memory checks.
+- The local TLS gateway now exposes authenticated `/v1/search` for phones that cannot reach modern HTTPS search services.
+
+See the [v0.4 implementation plan](docs/V0.4_IMPLEMENTATION_PLAN.md) for limits, migration, and acceptance criteria.
 
 ## What's new in v0.3.0
 
@@ -18,9 +32,9 @@ J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1
 
 ## Highlights
 
-- Four isolated profiles: OpenAI, DeepSeek, Kimi, and Custom. Each profile keeps its own API key, endpoints, model, reasoning settings, multimodal flag, model cache, and conversation history.
+- Four reusable provider profiles: OpenAI, DeepSeek, Kimi, and Custom. Each keeps its own API key, endpoints, model, reasoning settings, multimodal flag, and model cache; v0.4 conversations select a profile independently.
 - Automatic migration from the v0.1 `J2MELLM_CFG` and `J2MELLM_CHAT` stores. Legacy RMS data is retained instead of being deleted.
-- Primary and backup RMS records for profile configuration and per-profile conversations, with automatic recovery when the primary record is damaged.
+- Recoverable profile and conversation indexes plus independent CRC-protected message records, with automatic backup recovery when a primary index is damaged.
 - Model lists are fetched only when requested. The incremental parser reads `data[].id`, caches up to 64 model IDs, and never contacts a provider during startup.
 - Reasoning mode (`Auto`, `On`, or `Off`) is independent from whether received reasoning text is expanded or folded in the UI.
 - Multimodal support is disabled by default. File APIs, image reads, image decoding, and previews are loaded only when needed.
@@ -67,7 +81,7 @@ Build outputs:
 - `dist/J2ME-LLM.jar`
 - `dist/J2ME-LLM.jad`
 
-The release build runs 12 desktop self-tests, compiles with ECJ using Java 1.3 source and CLDC 1.1-compatible class files, and performs Java ME preverification with ProGuard. Do not use `-SkipTests` for release artifacts.
+The release build runs 16 desktop self-tests, compiles with ECJ using Java 1.3 source and CLDC 1.1-compatible class files, and performs Java ME preverification with ProGuard. Do not use `-SkipTests` for release artifacts.
 
 Start MicroEmulator with:
 
@@ -85,14 +99,15 @@ powershell -ExecutionPolicy Bypass -File .\tools\test-rms-upgrade-recovery.ps1
 
 Open [provisioner/index.html](provisioner/index.html) directly on an Android phone or computer. It is a single offline page with no network dependency and does not upload form data.
 
-1. Fill in one or more profiles and generate `J2ME-LLM-config-v2.j2cfg`.
-2. Share the file over Bluetooth to the Java ME phone.
-3. In J2ME LLM, open `Profiles -> Import configuration` and select the file.
-4. After a successful import, delete the plaintext package from the phone, Android downloads, and Bluetooth inbox if it is no longer needed.
+1. Fill in one or more model profiles and optionally configure a web-search preset, endpoint, and search API key.
+2. Generate `J2ME-LLM-config-v2.j2cfg`.
+3. Share the file over Bluetooth to the Java ME phone.
+4. In J2ME LLM, open `Profiles -> Import configuration` and select the file.
+5. After a successful import, delete the plaintext package from the phone, Android downloads, and Bluetooth inbox if it is no longer needed.
 
 The `.j2cfg` envelope uses versioned JSON, a Base64 payload, and CRC-32. This detects transfer corruption but provides **no encryption or source authentication**. API keys remain plaintext. Prefer a revocable, rate-limited gateway token instead of a long-lived account key. See the [provisioner documentation](provisioner/README.md) for the format and offline verification flow.
 
-Configuration export writes `J2ME-LLM-backup-<timestamp>.j2cfg` to the first writable filesystem root. Export uses a temporary file, byte-for-byte verification, and a same-directory rename. Configuration packages contain provider settings but not conversation history.
+Configuration export writes `J2ME-LLM-backup-<timestamp>.j2cfg` to the first writable filesystem root. Export uses a temporary file, byte-for-byte verification, and a same-directory rename. v0.4 packages contain provider and search settings, but not conversation history. Importing an older v2 package without a search object preserves the phone's current search settings.
 
 ## Reasoning controls
 

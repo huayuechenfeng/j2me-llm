@@ -3,6 +3,7 @@ package com.chihoko.j2mellm.provision;
 import com.chihoko.j2mellm.model.ProfileState;
 import com.chihoko.j2mellm.model.ProviderPresets;
 import com.chihoko.j2mellm.model.ProviderProfile;
+import com.chihoko.j2mellm.model.SearchConfig;
 
 import java.io.IOException;
 import java.util.Vector;
@@ -12,6 +13,11 @@ public final class ProvisioningMapper {
     private ProvisioningMapper() { }
 
     public static ProvisioningPackage exportProfiles(ProfileState state) {
+        return exportConfiguration(state, null);
+    }
+
+    public static ProvisioningPackage exportConfiguration(ProfileState state,
+            SearchConfig searchConfig) {
         ProvisioningPackage result = new ProvisioningPackage();
         result.setActiveProfileId(state.activeProfileId);
         int i;
@@ -35,6 +41,7 @@ public final class ProvisioningMapper {
             target.endpointOverridden = source.endpointOverride;
             result.addProfile(target);
         }
+        if (searchConfig != null) result.setSearchConfig(searchConfig);
         return result;
     }
 
@@ -54,7 +61,7 @@ public final class ProvisioningMapper {
             target.model = safe(incoming.model);
             target.systemPrompt = safe(incoming.systemPrompt);
             target.stream = incoming.stream;
-            target.historyMessages = clamp(incoming.historyMessages, 2, 24, 12);
+            target.historyMessages = clamp(incoming.historyMessages, 2, 256, 12);
             target.thinkingMode = clamp(incoming.thinkingMode,
                     ProviderProfile.THINKING_AUTO, ProviderProfile.THINKING_OFF,
                     ProviderProfile.THINKING_AUTO);
@@ -96,6 +103,18 @@ public final class ProvisioningMapper {
         if (result.find(result.activeProfileId) == null) {
             result.activeProfileId = ProviderPresets.OPENAI;
         }
+        return result;
+    }
+
+    /** An omitted search object deliberately preserves the device's current setting. */
+    public static SearchConfig importSearch(ProvisioningPackage source, SearchConfig previous)
+            throws IOException {
+        if (source == null) throw new IOException("配置包为空");
+        if (!source.hasSearchConfig()) {
+            return previous == null ? new SearchConfig() : previous.copy();
+        }
+        SearchConfig result = source.getSearchConfig();
+        result.normalize();
         return result;
     }
 
@@ -154,4 +173,3 @@ public final class ProvisioningMapper {
         return value == null ? "" : value;
     }
 }
-

@@ -1,6 +1,7 @@
 
 package com.chihoko.j2mellm.provision;
 
+import com.chihoko.j2mellm.model.SearchConfig;
 import com.chihoko.j2mellm.util.Crc32;
 import com.chihoko.j2mellm.util.Utf8;
 
@@ -17,8 +18,10 @@ public final class ProvisioningCodecSelfTest {
         rejectsUnknownVersion();
         rejectsOversizedFile();
         rejectsMissingActiveProfile();
+        acceptsPackageWithoutSearch();
         acceptsExactFieldLimits();
         rejectsOverlongFields();
+        rejectsInvalidSearch();
         System.out.println("ProvisioningCodecSelfTest OK");
     }
 
@@ -41,6 +44,12 @@ public final class ProvisioningCodecSelfTest {
         ProvisioningProfile second = (ProvisioningProfile) decoded.getProfiles().elementAt(1);
         equal(2, second.thinkingMode, "thinking mode");
         equal("high", second.reasoningEffort, "effort");
+        truth(decoded.hasSearchConfig(), "search included");
+        SearchConfig search = decoded.getSearchConfig();
+        truth(search.enabled, "search enabled");
+        equal(SearchConfig.BRAVE, search.presetId, "search preset");
+        equal("search-secret", search.apiKey, "search key");
+        equal(7, search.maximumResults, "search result count");
     }
 
     private static void rejectsTampering() throws Exception {
@@ -72,6 +81,14 @@ public final class ProvisioningCodecSelfTest {
         } catch (IOException expected) {
             contains(expected.getMessage(), "活动档案不存在", "missing active message");
         }
+    }
+
+    private static void acceptsPackageWithoutSearch() throws Exception {
+        ProvisioningPackage source = sample();
+        source.setSearchConfig(null);
+        ProvisioningPackage decoded = ProvisioningCodec.decode(
+                ProvisioningCodec.encode(source));
+        truth(!decoded.hasSearchConfig(), "old v2 package keeps search absent");
     }
 
     private static void acceptsExactFieldLimits() throws Exception {
@@ -136,8 +153,41 @@ public final class ProvisioningCodecSelfTest {
         expectEncodeFailure(config, "档案标识过长");
 
         config = sample();
-        ((ProvisioningProfile) config.getProfiles().elementAt(0)).historyMessages = 25;
-        expectEncodeFailure(config, "历史消息数必须在 2 到 24 之间");
+        ((ProvisioningProfile) config.getProfiles().elementAt(0)).historyMessages = 257;
+        expectEncodeFailure(config, "历史消息数必须在 2 到 256 之间");
+    }
+
+    private static void rejectsInvalidSearch() throws Exception {
+        ProvisioningPackage config = sample();
+        SearchConfig search = config.getSearchConfig();
+        search.endpoint = repeat('e', SearchConfig.MAX_ENDPOINT_CHARS + 1);
+        config.setSearchConfig(search);
+        expectEncodeFailure(config, "搜索端点过长");
+
+        config = sample();
+        search = config.getSearchConfig();
+        search.apiKey = repeat('k', SearchConfig.MAX_API_KEY_CHARS + 1);
+        config.setSearchConfig(search);
+        expectEncodeFailure(config, "搜索 API 密钥过长");
+
+        config = sample();
+        search = config.getSearchConfig();
+        search.presetId = "unknown-search";
+        config.setSearchConfig(search);
+        expectEncodeFailure(config, "搜索预设不受支持");
+
+        config = sample();
+        search = config.getSearchConfig();
+        search.maximumResults = 11;
+        config.setSearchConfig(search);
+        expectEncodeFailure(config, "搜索结果数必须在 1 到 10 之间");
+
+        config = sample();
+        search = config.getSearchConfig();
+        search.presetId = SearchConfig.TAVILY;
+        search.apiKey = "";
+        config.setSearchConfig(search);
+        expectEncodeFailure(config, "搜索预设需要 API 密钥");
     }
 
     private static void expectEncodeFailure(ProvisioningPackage config, String fragment)
@@ -185,6 +235,14 @@ public final class ProvisioningCodecSelfTest {
         deepseek.reasoningEffort = "high";
         deepseek.endpointOverridden = false;
         config.addProfile(deepseek);
+
+        SearchConfig search = new SearchConfig();
+        search.enabled = true;
+        search.presetId = SearchConfig.BRAVE;
+        search.endpoint = "https://api.search.brave.com/res/v1/web/search?q={query}&count={count}";
+        search.apiKey = "search-secret";
+        search.maximumResults = 7;
+        config.setSearchConfig(search);
         return config;
     }
 
@@ -225,5 +283,3 @@ public final class ProvisioningCodecSelfTest {
         throw new RuntimeException(message);
     }
 }
-
-

@@ -38,7 +38,7 @@ New-Item -ItemType Directory -Path $emulatorHome -Force | Out-Null
 $manifestLines = @(
     'Manifest-Version: 1.0',
     'MIDlet-Name: J2ME LLM RMS Test',
-    'MIDlet-Version: 0.3.0',
+    'MIDlet-Version: 0.4.0',
     'MIDlet-Vendor: Chihoko',
     'MIDlet-1: RMS Test,,com.chihoko.j2mellm.tests.UpgradeRecoveryMidlet',
     'MicroEdition-Configuration: CLDC-1.1',
@@ -80,7 +80,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Upgrade fixture preverification failed.' }
 $jarSize = (Get-Item -LiteralPath $finalJar).Length
 $jadLines = @(
     'MIDlet-Name: J2ME LLM RMS Test',
-    'MIDlet-Version: 0.3.0',
+    'MIDlet-Version: 0.4.0',
     'MIDlet-Vendor: Chihoko',
     'MIDlet-1: RMS Test,,com.chihoko.j2mellm.tests.UpgradeRecoveryMidlet',
     'MicroEdition-Configuration: CLDC-1.1',
@@ -128,6 +128,5 @@ if ($stdout -notmatch 'UPGRADE_RECOVERY_MIDLET_PASSED') {
     throw "RMS upgrade/recovery fixture failed.`nSTDOUT:`n$stdout`nSTDERR:`n$stderr"
 }
 Write-Output 'MicroEmulator RMS upgrade/recovery test passed.'
-
 
 

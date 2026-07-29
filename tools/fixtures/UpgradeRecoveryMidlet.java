@@ -4,9 +4,13 @@
 package com.chihoko.j2mellm.tests;
 
 import com.chihoko.j2mellm.model.ChatMessage;
+import com.chihoko.j2mellm.model.ConversationMeta;
+import com.chihoko.j2mellm.model.ConversationState;
 import com.chihoko.j2mellm.model.ProfileState;
 import com.chihoko.j2mellm.model.ProviderPresets;
 import com.chihoko.j2mellm.model.ProviderProfile;
+import com.chihoko.j2mellm.store.ConversationIndexStore;
+import com.chihoko.j2mellm.store.ConversationStoreV3;
 import com.chihoko.j2mellm.store.ProfileConversationStore;
 import com.chihoko.j2mellm.store.ProfileStore;
 
@@ -65,6 +69,37 @@ public final class UpgradeRecoveryMidlet extends MIDlet {
             Vector recoveredMessages = recoveredChats.load();
             require(recoveredChats.didRecoverFromBackup(), "chat backup recovery marker");
             require(recoveredMessages.size() == 1, "chat backup value");
+
+            ConversationMeta meta = new ConversationMeta("fixture_chat", ProviderPresets.CUSTOM);
+            meta.title = "migrated title";
+            ConversationState conversationState = new ConversationState();
+            conversationState.add(meta);
+            ConversationIndexStore conversationIndex = new ConversationIndexStore();
+            conversationIndex.save(conversationState);
+            meta.title = "new title";
+            conversationIndex.save(conversationState);
+            corruptPrimary(ConversationIndexStore.STORE_NAME);
+            ConversationState recoveredIndex = conversationIndex.load();
+            require(recoveredIndex.recoveredFromBackup, "v0.4 index backup marker");
+            require("migrated title".equals(recoveredIndex.getActive().title),
+                    "v0.4 index backup value");
+
+            ConversationStoreV3 v4Chat = new ConversationStoreV3(meta);
+            Vector firstV4 = new Vector();
+            firstV4.addElement(new ChatMessage(ChatMessage.ROLE_USER, "v4 question"));
+            v4Chat.save(firstV4, 64);
+            Vector secondV4 = new Vector();
+            secondV4.addElement(new ChatMessage(ChatMessage.ROLE_USER, "v4 newer question"));
+            secondV4.addElement(new ChatMessage(ChatMessage.ROLE_ASSISTANT, "v4 answer"));
+            v4Chat.save(secondV4, 64);
+            corruptPrimary(v4Chat.getStoreName());
+            ConversationStoreV3 recoveredV4Chat = new ConversationStoreV3(meta);
+            Vector recoveredV4Messages = recoveredV4Chat.load();
+            require(recoveredV4Chat.didRecoverFromBackup(), "v0.4 chat backup marker");
+            require(recoveredV4Messages.size() == 1, "v0.4 chat backup count");
+            require("v4 question".equals(
+                    ((ChatMessage) recoveredV4Messages.elementAt(0)).getContent()),
+                    "v0.4 chat backup value");
 
             System.out.println("UPGRADE_RECOVERY_MIDLET_PASSED");
         } catch (Throwable failure) {
@@ -147,7 +182,8 @@ public final class UpgradeRecoveryMidlet extends MIDlet {
     private void resetStores() {
         String[] stores = new String[] {
             ProfileStore.STORE_NAME, ProfileStore.LEGACY_STORE_NAME,
-            "J2MELLM_CHAT", "J2CHAT_custom"
+            "J2MELLM_CHAT", "J2CHAT_custom",
+            ConversationIndexStore.STORE_NAME, "J2C_fixture_chat"
         };
         int i;
         for (i = 0; i < stores.length; i++) {
@@ -160,6 +196,3 @@ public final class UpgradeRecoveryMidlet extends MIDlet {
         if (!value) throw new RuntimeException("failed: " + label);
     }
 }
-
-
-

@@ -3,7 +3,7 @@ Set-StrictMode -Version 2.0
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $nodeVersion = '24.14.0'
-$packageVersion = '0.3.0'
+$packageVersion = '0.4.0'
 $nodeArchiveName = 'node-v' + $nodeVersion + '-win-x64.zip'
 $downloadRoot = Join-Path $projectRoot '.tools\downloads'
 $nodeArchive = Join-Path $downloadRoot $nodeArchiveName
@@ -74,6 +74,9 @@ $config = @(
     'UPSTREAM_MODELS_URL=https://api.openai.com/v1/models',
     'UPSTREAM_API_KEY=PASTE_YOUR_REAL_API_KEY_HERE',
     'UPSTREAM_MODEL=',
+    'SEARCH_PROVIDER=free',
+    'UPSTREAM_SEARCH_URL=',
+    'UPSTREAM_SEARCH_API_KEY=',
     'DEVICE_TOKEN=AUTO',
     'LOG_ERRORS=0'
 )

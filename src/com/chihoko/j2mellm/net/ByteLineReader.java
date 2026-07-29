@@ -7,15 +7,15 @@ import java.io.IOException;
 import java.io.InputStream;
 
 final class ByteLineReader {
-    private static final int MAX_LINE_BYTES = 65536;
-
     private final InputStream input;
+    private final int maximumLineBytes;
     private final byte[] buffer = new byte[512];
     private int position;
     private int length;
 
-    ByteLineReader(InputStream input) {
+    ByteLineReader(InputStream input, int limit) {
         this.input = input;
+        maximumLineBytes = limit < 65536 ? 65536 : limit;
     }
 
     String readLine() throws IOException {
@@ -32,7 +32,7 @@ final class ByteLineReader {
                 return Utf8.decode(line.toByteArray());
             }
             if (value != '\r') {
-                if (line.size() >= MAX_LINE_BYTES) {
+                if (line.size() >= maximumLineBytes) {
                     throw new IOException("服务器返回的单行数据过长");
                 }
                 line.write(value);
@@ -49,4 +49,3 @@ final class ByteLineReader {
         return buffer[position++] & 0xff;
     }
 }
-

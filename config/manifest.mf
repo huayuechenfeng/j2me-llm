@@ -1,6 +1,6 @@
 Manifest-Version: 1.0
 MIDlet-Name: J2ME LLM
-MIDlet-Version: 0.3.0
+MIDlet-Version: 0.4.0
 MIDlet-Vendor: Chihoko
 MIDlet-1: J2ME LLM,,com.chihoko.j2mellm.LlmMidlet
 Nokia-MIDlet-On-Screen-Keypad: no

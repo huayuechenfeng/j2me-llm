@@ -1,8 +1,17 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const http = require('node:http');
-const { createGateway, fromEnvironment } = require('./server');
+const os = require('node:os');
+const path = require('node:path');
+const {
+  createGateway,
+  fromEnvironment,
+  parseConfigText,
+  runtimeEnvironment,
+  validateConfig,
+} = require('./server');
 
 async function listen(server) {
   await new Promise((resolve, reject) => {
@@ -48,6 +57,17 @@ async function main() {
         return;
       }
 
+      if (request.method === 'GET' && request.url === '/search?q=hello&count=2') {
+        response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({
+          results: [
+            { title: 'One', url: 'https://one.example', content: 'First' },
+            { title: 'Two', url: 'https://two.example', snippet: 'Second' },
+          ],
+        }));
+        return;
+      }
+
       response.writeHead(404, { 'content-type': 'application/json' });
       response.end('{"error":"unexpected test route"}');
     });
@@ -58,6 +78,9 @@ async function main() {
     upstreamUrl: 'http://127.0.0.1:' + upstreamPort + '/v1/chat/completions',
     upstreamApiKey: 'upstream-secret',
     upstreamModel: 'gateway-model',
+    searchProvider: 'custom',
+    upstreamSearchUrl: 'http://127.0.0.1:' + upstreamPort
+      + '/search?q={query}&count={count}',
     deviceToken: 'device-token-1234',
     allowInsecureUpstream: true,
   });
@@ -66,6 +89,11 @@ async function main() {
   try {
     const health = await fetch('http://127.0.0.1:' + gatewayPort + '/health');
     assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), {
+      ok: true,
+      service: 'j2me-llm-gateway',
+      searchProvider: 'custom',
+    });
 
     const deniedChat = await fetch(
       'http://127.0.0.1:' + gatewayPort + '/v1/chat/completions',
@@ -77,6 +105,10 @@ async function main() {
       'http://127.0.0.1:' + gatewayPort + '/v1/models',
     );
     assert.equal(deniedModels.status, 401);
+    const deniedSearch = await fetch(
+      'http://127.0.0.1:' + gatewayPort + '/v1/search?q=hello',
+    );
+    assert.equal(deniedSearch.status, 401);
     assert.equal(upstreamCalls.length, 0);
 
     const models = await fetch(
@@ -111,13 +143,31 @@ async function main() {
     assert.equal(accepted.headers.get('content-type'), 'text/event-stream');
     assert.match(await accepted.text(), /data: \[DONE\]/);
 
+    const search = await fetch(
+      'http://127.0.0.1:' + gatewayPort + '/v1/search?q=hello&count=2',
+      { headers: { authorization: 'Bearer device-token-1234' } },
+    );
+    assert.equal(search.status, 200);
+    assert.deepEqual(await search.json(), {
+      results: [
+        { title: 'One', url: 'https://one.example', snippet: 'First' },
+        { title: 'Two', url: 'https://two.example', snippet: 'Second' },
+      ],
+    });
+
     assert.deepEqual(
       upstreamCalls.map((call) => [call.method, call.path]),
-      [['GET', '/v1/models'], ['POST', '/v1/chat/completions']],
+      [
+        ['GET', '/v1/models'],
+        ['POST', '/v1/chat/completions'],
+        ['GET', '/search?q=hello&count=2'],
+      ],
     );
     for (const call of upstreamCalls) {
-      assert.equal(call.authorization, 'Bearer upstream-secret');
-      assert.equal(call.userAgent, 'J2ME-LLM-Gateway/0.3.0');
+      if (call.path !== '/search?q=hello&count=2') {
+        assert.equal(call.authorization, 'Bearer upstream-secret');
+      }
+      assert.equal(call.userAgent, 'J2ME-LLM-Gateway/0.4.0');
     }
 
     assert.throws(
@@ -158,6 +208,49 @@ async function main() {
     assert.equal(envConfig.upstreamModelsUrl, 'https://catalog.example/v1/models');
     assert.equal(envConfig.allowInsecureUpstream, undefined);
     assert.equal(envConfig.logErrors, true);
+
+    const parsed = parseConfigText('\uFEFF# comment\r\n'
+      + ' SEARCH_PROVIDER = public-searxng\r\n'
+      + 'UPSTREAM_SEARCH_URL=https://search.example/search?q={query}&format=json\r\n'
+      + 'UPSTREAM_SEARCH_API_KEY = search-secret\r\n');
+    assert.equal(parsed.SEARCH_PROVIDER, 'public-searxng');
+    assert.equal(parsed.UPSTREAM_SEARCH_URL,
+      'https://search.example/search?q={query}&format=json');
+    assert.equal(parsed.UPSTREAM_SEARCH_API_KEY, 'search-secret');
+
+    const normalized = validateConfig({
+      upstreamUrl: 'https://provider.example/v1/chat/completions',
+      upstreamApiKey: 'upstream-secret',
+      searchProvider: 'public-searxng',
+      deviceToken: 'device-token-1234',
+    });
+    assert.equal(normalized.searchProvider, 'searxng');
+    assert.match(normalized.upstreamSearchUrl, /^https:\/\/search\.inetol\.net\//);
+
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'j2me-gateway-'));
+    const configPath = path.join(temporary, 'gateway.conf');
+    try {
+      fs.writeFileSync(configPath,
+        'HOST=0.0.0.0\n'
+          + 'UPSTREAM_URL=https://provider.example/v1/chat/completions\n'
+          + 'UPSTREAM_API_KEY=from-file-upstream\n'
+          + 'DEVICE_TOKEN=device-token-1234\n'
+          + 'SEARCH_PROVIDER=brave\n'
+          + 'UPSTREAM_SEARCH_API_KEY=from-file\n',
+        'utf8');
+      const loaded = runtimeEnvironment(
+        { HOST: '127.0.0.1', SEARCH_PROVIDER: 'free' },
+        ['--config', configPath],
+      );
+      assert.equal(loaded.HOST, '0.0.0.0');
+      assert.equal(loaded.SEARCH_PROVIDER, 'brave');
+      assert.equal(loaded.UPSTREAM_SEARCH_API_KEY, 'from-file');
+      const loadedConfig = validateConfig(fromEnvironment(loaded));
+      assert.equal(loadedConfig.searchProvider, 'brave');
+      assert.equal(loadedConfig.upstreamSearchApiKey, 'from-file');
+    } finally {
+      fs.rmSync(temporary, { recursive: true, force: true });
+    }
 
     console.log('Gateway self-test passed');
   } finally {

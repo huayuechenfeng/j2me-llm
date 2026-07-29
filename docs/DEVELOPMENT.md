@@ -93,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\build.ps1 -SkipTests
 
 ## 4. 自动化自测
 
-v0.3 的自测都是普通 `public static void main`，不依赖 JUnit；需要 MIDP 类型的请求测试使用最小桌面 stub，便于老工具链和离线构建。构建脚本应运行以下项目：
+v0.4 的自测都是普通 `public static void main`，不依赖 JUnit；需要 MIDP 类型的请求测试使用最小桌面 stub，便于老工具链和离线构建。构建脚本应运行以下项目：
 
 | 自测 | 覆盖点 |
 | --- | --- |
@@ -106,6 +106,10 @@ v0.3 的自测都是普通 `public static void main`，不依赖 JUnit；需要 
 | `ModelCatalogParserSelfTest` | 任意分块、UTF-8、`data[].id`、去重/截断、响应大小和畸形 JSON |
 | `ProfileCodecSelfTest` | v2 profile 往返、固定四档案规范化、字段上限、CRC 损坏拒绝、旧配置字段迁移编解码 |
 | `ConversationRecordValidatorSelfTest` | 历史记录头、档案 ID、计数边界和 CRC 的无消息解码校验 |
+| `ConversationIndexCodecSelfTest` | 多对话元数据、活动 ID、UTF-8 与 CRC 损坏拒绝 |
+| `ConversationMessageCodecSelfTest` | 超过 `writeUTF` 的长消息、搜索来源和逐消息 CRC |
+| `ResourceLimitsCodecSelfTest` | 自定义上下文/图片预算往返与损坏拒绝 |
+| `SearchConfigCodecSelfTest` | 搜索预设、密钥、端点、结果上限与 CRC |
 | `ProvisioningCodecSelfTest` | `.j2cfg` 往返、Base64/CRC/版本、字段和文件上限、重复 ID/活动 ID |
 | `ProvisioningMapperSelfTest` | 四固定档案导入导出、部分导入保留、常开思考规范化、活动档案和模型缓存种子 |
 | `I18nSelfTest` | 自动语言解析、中英文词条完整性、已知错误翻译和内置档案名显示 |
@@ -270,7 +274,7 @@ node .\gateway\server.js
 
 ### 8.7 覆盖更新与恢复
 
-- [ ] 从实际 v0.1.0 / v0.2.0 包创建配置和历史，再覆盖安装 0.3.0。
+- [ ] 从实际 v0.1.0 / v0.2.0 / v0.3.0 包创建配置和历史，再覆盖安装 0.4.0。
 - [ ] 安装器明确识别更新，Name/Vendor/签名一致。
 - [ ] 旧配置和历史迁入“自定义（旧配置）”，其他档案保持默认。
 - [ ] 连续重启两次不会重复迁移。
@@ -309,7 +313,7 @@ node .\gateway\server.js
 
 ### 11.1 版本与描述符
 
-- [ ] `config/manifest.mf` 与生成 JAD 都是 `MIDlet-Version: 0.3.0`。
+- [ ] `config/manifest.mf` 与生成 JAD 都是 `MIDlet-Version: 0.4.0`。
 - [ ] Name/Vendor 与 v0.1 完全相同，大小写和空格也相同。
 - [ ] JAD 的 `MIDlet-Jar-Size` 等于最终 JAR 实际字节数。
 - [ ] 必需权限只有 HTTP/HTTPS；JSR-75 file read/write 为可选权限。
@@ -331,7 +335,7 @@ node .\gateway\server.js
 建议归档：
 
 ```text
-J2ME-LLM-0.3.0/
+J2ME-LLM-0.4.0/
   J2ME-LLM.jar
   J2ME-LLM.jad
   provisioner/index.html
@@ -363,8 +367,6 @@ CLDC/MIDP/JSR-75 能力：
 报告中必须删除 Authorization、`.j2cfg` payload、真实敏感提示词和可识别的私人图片。
 
 本文按 2026-07-25 的 v0.3 工具链与源码结构编写。
-
-
 
 
 

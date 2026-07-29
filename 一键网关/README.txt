@@ -19,7 +19,7 @@ J2ME LLM 独立一键网关（Windows x64）
 
 4. 保存配置，双击“启动网关.bat”。
 5. Windows 防火墙询问时，只允许“专用网络”。
-6. BAT 窗口会显示手机需要填写的 Chat、Models 和 API Key。
+6. BAT 窗口会显示手机需要填写的 Chat、Models、Search 和 API Key。
 7. 网关使用期间不要关闭 BAT 窗口。
 
 
@@ -39,6 +39,20 @@ UPSTREAM_URL=https://api.moonshot.cn/v1/chat/completions
 UPSTREAM_MODELS_URL=https://api.moonshot.cn/v1/models
 
 UPSTREAM_MODEL 通常留空，由手机选择模型。如果填写，网关会强制使用该模型。
+
+联网搜索默认使用无需密钥的组合：
+
+SEARCH_PROVIDER=free
+UPSTREAM_SEARCH_URL=
+UPSTREAM_SEARCH_API_KEY=
+
+也可把 SEARCH_PROVIDER 改为 searxng、brave、tavily、exa 或 custom。
+为方便和手机客户端配置对应，也接受 free-composite 和 public-searxng 两个别名。
+Brave、Tavily、Exa 还需要填写 UPSTREAM_SEARCH_API_KEY。
+切换预设并希望使用它的默认端点时，请把 UPSTREAM_SEARCH_URL 留空；
+只要该字段非空，网关就会把它视为有意设置的自定义上游地址。
+修改 gateway.conf 后必须重启网关。启动窗口会显示本次读取到的 Search provider；
+访问 /health 时，searchProvider 字段也会显示实际生效的规范化预设名。
 
 
 三、手机设备令牌
@@ -66,13 +80,18 @@ BAT 假设显示电脑地址为 192.168.1.20，端口为 8787：
 
 聊天端点：http://192.168.1.20:8787/v1/chat/completions
 模型端点：http://192.168.1.20:8787/v1/models
+搜索端点：http://192.168.1.20:8787/v1/search?q={query}&count={count}
 API Key：BAT 显示的 12 位数字
+
+手机的搜索设置应选择“自定义 JSON API”，搜索端点和搜索 API Key
+分别填写上面的搜索端点与同一个 12 位数字令牌。
 
 先在手机浏览器打开：
 
 http://192.168.1.20:8787/health
 
 如果看到包含 ok、true 和 j2me-llm-gateway 的文字，说明手机已经连通电脑。
+其中 searchProvider 应与 gateway.conf 中的选择一致（别名会显示为 free 或 searxng）。
 
 
 五、故障排查

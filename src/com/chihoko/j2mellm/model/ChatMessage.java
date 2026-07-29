@@ -5,34 +5,36 @@ import javax.microedition.lcdui.Image;
 public final class ChatMessage {
     public static final String ROLE_USER = "user";
     public static final String ROLE_ASSISTANT = "assistant";
-    private static final int MAX_CONTENT_CHARS = 24576;
-    private static final int MAX_REASONING_CHARS = 8192;
+    private static int maximumContentChars = 49152;
+    private static int maximumReasoningChars = 16384;
 
     public final String role;
     private final StringBuffer content;
     private final StringBuffer reasoning;
     private MessageMedia media;
+    private SearchBundle searchBundle;
     private int revision;
     public boolean pending;
     public boolean error;
 
     public ChatMessage(String role, String text) {
         this.role = role;
-        this.content = new StringBuffer(text == null ? "" : text);
+        this.content = new StringBuffer();
         this.reasoning = new StringBuffer();
+        appendLimited(this.content, text, maximumContentChars);
     }
 
     public synchronized void appendContent(String text) {
-        if (appendLimited(content, text, MAX_CONTENT_CHARS)) revision++;
+        if (appendLimited(content, text, maximumContentChars)) revision++;
     }
 
     public synchronized void appendReasoning(String text) {
-        if (appendLimited(reasoning, text, MAX_REASONING_CHARS)) revision++;
+        if (appendLimited(reasoning, text, maximumReasoningChars)) revision++;
     }
 
     public synchronized void replaceContent(String text) {
         content.setLength(0);
-        appendLimited(content, text, MAX_CONTENT_CHARS);
+        appendLimited(content, text, maximumContentChars);
         revision++;
     }
 
@@ -49,7 +51,25 @@ public final class ChatMessage {
     }
 
     public synchronized int getCharacterCost() {
-        return content.length() + reasoning.length();
+        int value = content.length() + reasoning.length();
+        if (searchBundle != null) value += searchBundle.getCharacterCost();
+        return value;
+    }
+
+    public synchronized void setSearchBundle(SearchBundle value) {
+        searchBundle = value;
+        revision++;
+    }
+
+    public synchronized SearchBundle getSearchBundle() {
+        return searchBundle;
+    }
+
+    public static synchronized void configureLimits(ResourceLimits limits) {
+        ResourceLimits value = limits == null ? ResourceLimits.recommended() : limits;
+        value.normalize();
+        maximumContentChars = value.messageContentChars;
+        maximumReasoningChars = value.messageReasoningChars;
     }
 
     public synchronized int getRevision() {

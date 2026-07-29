@@ -50,7 +50,14 @@ Payload 结构：
       "multimodal": false,
       "endpointOverridden": false
     }
-  ]
+  ],
+  "search": {
+    "enabled": true,
+    "preset": "free-composite",
+    "endpoint": "https://api.duckduckgo.com/?q={query}&format=json&no_html=1&skip_disambig=1",
+    "apiKey": "",
+    "maximumResults": 5
+  }
 }
 ```
 
@@ -64,6 +71,12 @@ Payload 结构：
 - 档案/预设标识最多 32 字符，档案名称 64 字符。
 - 聊天端点与模型端点各 512 字符，API Key 2048 字符，模型名 128 字符。
 - 系统提示词 4096 字符，思考强度 32 字符。
+- `search` 是 v2 的可选对象；旧 v2 包没有该对象时，手机会保留当前搜索设置。新版网页和手机客户端导出的备份会包含它。
+- 搜索预设为 `free-composite`、`public-searxng`、`brave`、`tavily`、`exa` 或 `custom`。其中 Brave、Tavily、Exa 在启用时必须填写密钥。
+- 联网搜索仍是测试功能；免费无密钥模式和公共 SearXNG 只建议作为兜底或参考。为获得相对稳定的结果，推荐配置 Brave、Tavily、Exa 等服务的 API Key，并使用本离线工具生成配置包后导入手机端。
+- 搜索端点最多 512 字符，搜索 API Key 最多 256 字符，`maximumResults` 范围为 1–10。自定义 GET JSON API 可在端点中使用 `{query}` 和 `{count}` 占位符。
+- `free-composite` 使用 DuckDuckGo Instant Answer，并在结果不足时补充 Wikipedia；`public-searxng` 是免密公共实例参考预设。两者都不承诺稳定性、完整性、隐私策略或长期可用性。
+- 在网页中切换搜索预设会立即把搜索端点重置为该预设的默认值；如需网关或其他自定义地址，请在选定预设后再编辑端点。
 
 网页输入框使用相同的 `maxlength`，生成与载入时还会再次逐字段检查。这里的“字符”与 Java ME `String.length()` 一致，按 UTF-16 代码单元计数；超限配置整包拒绝，不会静默截断。
 
@@ -73,7 +86,4 @@ Java 端应先检查文件大小，再解析外层 JSON、验证格式与版本�
 
 网页的“载入备份检查”会完成版本、大小、Base64、CRC、JSON、档案数量和字段上限检查，再把可识别的四类档案放回表单。它适合在发送前验证刚生成的文件，但不会代替手机端的导入校验。
 
-手机端允许部分配置包：包中出现的档案替换相应槽位，省略档案的 Key、端点、模型、开关和缓存保持不变；未填写 `activeProfile` 时保留当前活动档案。手机导出的备份默认名为 `J2ME-LLM-backup-<毫秒时间戳>.j2cfg`。导出先写同目录临时文件并回读校验，再改名；最终目标已存在时直接拒绝，绝不会截断旧备份。
-
-
-
+手机端允许部分配置包：包中出现的档案替换相应槽位，省略档案的 Key、端点、模型、开关和缓存保持不变；未填写 `activeProfile` 时保留当前活动档案；省略 `search` 时保留当前搜索设置。手机导出的备份默认名为 `J2ME-LLM-backup-<毫秒时间戳>.j2cfg`。导出先写同目录临时文件并回读校验，再改名；最终目标已存在时直接拒绝，绝不会截断旧备份。

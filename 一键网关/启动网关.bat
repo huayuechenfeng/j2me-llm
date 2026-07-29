@@ -17,6 +17,8 @@ if not exist "%SERVER%" goto broken_package
 rem Generate a phone-friendly 12-digit token. Old UUID tokens from the previous BAT are migrated too.
 "%NODE%" -e "const fs=require('fs'),c=require('crypto'),p=process.argv[1];let s=fs.readFileSync(p,'utf8'),m=s.match(/^DEVICE_TOKEN=(.*)$/m);if(m){const v=m[1].trim();if(v==='AUTO'||/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)){let t='';for(let i=0;i<12;i++)t+=c.randomInt(0,10);s=s.replace(/^DEVICE_TOKEN=.*$/m,'DEVICE_TOKEN='+t);fs.writeFileSync(p,s,'utf8')}}" "%CONFIG%"
 if errorlevel 1 goto token_error
+"%NODE%" -e "const fs=require('fs'),p=process.argv[1];let s=fs.readFileSync(p,'utf8'),n=s.includes('\r\n')?'\r\n':'\n';for(const [k,v] of [['SEARCH_PROVIDER','free'],['UPSTREAM_SEARCH_URL',''],['UPSTREAM_SEARCH_API_KEY','']]){if(!(new RegExp('^'+k+'=','m')).test(s)){if(s.length&&!s.endsWith('\n'))s+=n;s+=k+'='+v+n}}fs.writeFileSync(p,s,'utf8')" "%CONFIG%"
+if errorlevel 1 goto config_migration_error
 
 set "HOST="
 set "PORT="
@@ -24,6 +26,9 @@ set "UPSTREAM_URL="
 set "UPSTREAM_MODELS_URL="
 set "UPSTREAM_API_KEY="
 set "UPSTREAM_MODEL="
+set "SEARCH_PROVIDER="
+set "UPSTREAM_SEARCH_URL="
+set "UPSTREAM_SEARCH_API_KEY="
 set "DEVICE_TOKEN="
 set "LOG_ERRORS="
 
@@ -34,6 +39,9 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%CONFIG%") do (
     if /I "%%A"=="UPSTREAM_MODELS_URL" set "UPSTREAM_MODELS_URL=%%B"
     if /I "%%A"=="UPSTREAM_API_KEY" set "UPSTREAM_API_KEY=%%B"
     if /I "%%A"=="UPSTREAM_MODEL" set "UPSTREAM_MODEL=%%B"
+    if /I "%%A"=="SEARCH_PROVIDER" set "SEARCH_PROVIDER=%%B"
+    if /I "%%A"=="UPSTREAM_SEARCH_URL" set "UPSTREAM_SEARCH_URL=%%B"
+    if /I "%%A"=="UPSTREAM_SEARCH_API_KEY" set "UPSTREAM_SEARCH_API_KEY=%%B"
     if /I "%%A"=="DEVICE_TOKEN" set "DEVICE_TOKEN=%%B"
     if /I "%%A"=="LOG_ERRORS" set "LOG_ERRORS=%%B"
 )
@@ -41,6 +49,7 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%CONFIG%") do (
 if not defined HOST set "HOST=0.0.0.0"
 if not defined PORT set "PORT=8787"
 if not defined LOG_ERRORS set "LOG_ERRORS=0"
+if not defined SEARCH_PROVIDER set "SEARCH_PROVIDER=free"
 if not defined UPSTREAM_URL goto invalid_config
 if not defined UPSTREAM_API_KEY goto invalid_config
 if not defined DEVICE_TOKEN goto token_error
@@ -54,6 +63,12 @@ echo ============================================================
 echo.
 echo Gateway port: %PORT%
 echo Phone API Key: %DEVICE_TOKEN%
+echo Search provider: %SEARCH_PROVIDER%
+if defined UPSTREAM_SEARCH_URL (
+    echo Search upstream: %UPSTREAM_SEARCH_URL%
+) else (
+    echo Search upstream: preset default
+)
 echo.
 set "PHONE_IP="
 set "IP_FILE=%TEMP%\j2me-gateway-ip-%RANDOM%-%RANDOM%.txt"
@@ -66,6 +81,7 @@ echo.
 echo   Health: http://%PHONE_IP%:%PORT%/health
 echo   Chat:   http://%PHONE_IP%:%PORT%/v1/chat/completions
 echo   Models: http://%PHONE_IP%:%PORT%/v1/models
+echo   Search: http://%PHONE_IP%:%PORT%/v1/search?q={query}^&count={count}
 echo   API Key: %DEVICE_TOKEN%
 echo.
 echo Keep this window open while the phone is using the gateway.
@@ -74,7 +90,7 @@ echo Close this window or press Ctrl+C to stop.
 echo ============================================================
 echo.
 
-"%NODE%" "%SERVER%"
+"%NODE%" "%SERVER%" --config "%CONFIG%"
 set "GATEWAY_EXIT=%ERRORLEVEL%"
 echo.
 echo Gateway stopped with exit code %GATEWAY_EXIT%.
@@ -91,6 +107,9 @@ exit /b %GATEWAY_EXIT%
     echo UPSTREAM_MODELS_URL=https://api.openai.com/v1/models
     echo UPSTREAM_API_KEY=PASTE_YOUR_REAL_API_KEY_HERE
     echo UPSTREAM_MODEL=
+    echo SEARCH_PROVIDER=free
+    echo UPSTREAM_SEARCH_URL=
+    echo UPSTREAM_SEARCH_API_KEY=
     echo DEVICE_TOKEN=AUTO
     echo LOG_ERRORS=0
 ) > "%CONFIG%"
@@ -118,9 +137,14 @@ echo Set DEVICE_TOKEN=AUTO in gateway.conf and try again.
 pause
 exit /b 4
 
+:config_migration_error
+echo [ERROR] Could not update gateway.conf with search settings.
+echo Check that the file is writable, then try again.
+pause
+exit /b 5
+
 :self_test
 if not exist "%NODE%" goto broken_package
 if not exist "%SELFTEST%" goto broken_package
 "%NODE%" "%SELFTEST%"
 exit /b %ERRORLEVEL%
-

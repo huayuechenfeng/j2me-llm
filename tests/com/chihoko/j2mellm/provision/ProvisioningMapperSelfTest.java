@@ -4,6 +4,7 @@ package com.chihoko.j2mellm.provision;
 import com.chihoko.j2mellm.model.ProfileState;
 import com.chihoko.j2mellm.model.ProviderPresets;
 import com.chihoko.j2mellm.model.ProviderProfile;
+import com.chihoko.j2mellm.model.SearchConfig;
 
 public final class ProvisioningMapperSelfTest {
     public static void main(String[] args) throws Exception {
@@ -17,9 +18,17 @@ public final class ProvisioningMapperSelfTest {
         custom.model = "local-model";
         custom.thinkingProtocol = ProviderProfile.THINKING_PROTOCOL_ENABLED_OBJECT;
 
+        SearchConfig searchBefore = new SearchConfig();
+        searchBefore.enabled = true;
+        searchBefore.presetId = SearchConfig.PUBLIC_SEARXNG;
+        searchBefore.endpoint =
+                "https://search.inetol.net/search?q={query}&format=json&categories=general";
+        searchBefore.maximumResults = 6;
         ProvisioningPackage transport = ProvisioningCodec.decode(
-                ProvisioningCodec.encode(ProvisioningMapper.exportProfiles(before)));
+                ProvisioningCodec.encode(
+                        ProvisioningMapper.exportConfiguration(before, searchBefore)));
         ProfileState after = ProvisioningMapper.importProfiles(transport, before);
+        SearchConfig searchAfter = ProvisioningMapper.importSearch(transport, null);
         require(ProviderPresets.KIMI.equals(after.activeProfileId), "active profile");
         require("openai-secret".equals(after.find(ProviderPresets.OPENAI).apiKey), "key round trip");
         ProviderProfile restored = after.find(ProviderPresets.CUSTOM);
@@ -28,9 +37,38 @@ public final class ProvisioningMapperSelfTest {
                 "custom thinking dialect");
         require(restored.reasoningExpanded, "local fold preference preserved");
         require(restored.containsModel("local-model"), "selected model seeds cache");
+        require(searchAfter.enabled, "search enabled round trip");
+        require(SearchConfig.PUBLIC_SEARXNG.equals(searchAfter.presetId),
+                "search preset round trip");
+        require(searchAfter.maximumResults == 6, "search count round trip");
         partialImportPreservesOmittedProfiles();
+        packageWithoutSearchPreservesCurrentSearch();
         customAlwaysThinkingNormalizesOff();
         System.out.println("ProvisioningMapperSelfTest passed");
+    }
+
+    private static void packageWithoutSearchPreservesCurrentSearch() throws Exception {
+        SearchConfig before = new SearchConfig();
+        before.enabled = true;
+        before.presetId = SearchConfig.EXA;
+        before.endpoint = "https://api.exa.ai/search";
+        before.apiKey = "keep-search-key";
+        before.maximumResults = 9;
+        ProvisioningPackage profilesOnly = new ProvisioningPackage();
+        ProvisioningProfile incoming = new ProvisioningProfile();
+        incoming.id = ProviderPresets.OPENAI;
+        incoming.preset = ProviderPresets.OPENAI;
+        profilesOnly.addProfile(incoming);
+
+        SearchConfig after = ProvisioningMapper.importSearch(profilesOnly, before);
+        require(after.enabled, "omitted search preserves enabled state");
+        require(SearchConfig.EXA.equals(after.presetId),
+                "omitted search preserves preset");
+        require("keep-search-key".equals(after.apiKey),
+                "omitted search preserves key");
+        after.apiKey = "changed";
+        require("keep-search-key".equals(before.apiKey),
+                "preserved search is detached");
     }
 
     private static void partialImportPreservesOmittedProfiles() throws Exception {
@@ -115,5 +153,4 @@ public final class ProvisioningMapperSelfTest {
         if (!value) throw new RuntimeException("failed: " + label);
     }
 }
-
 

@@ -44,12 +44,14 @@ MIDlet start
       -> 主记录坏、备份有效：加载备份并修复主记录
       -> v2 库不存在：读取 v0.1 J2MELLM_CFG，迁入 custom
   -> 选择 activeProfileId
-  -> ProfileConversationStore(active).load()
-      -> 必要时把 v0.1 J2MELLM_CHAT 迁入 custom
-  -> ChatCanvas 绑定当前档案与其消息 Vector
+  -> ConversationIndexStore.load()
+      -> 主索引损坏时从恢复副本修复
+      -> 首次 v0.4 启动时把非空 J2CHAT_<profileId> 迁为独立对话
+  -> ConversationStoreV3(activeConversation).load()
+  -> ChatCanvas 绑定活动对话、消息 Vector 与该对话选用的档案
 ```
 
-档案切换前保存当前会话，切换后换用对应 `J2CHAT_<id>`。聊天 Vector 不跨档案共享。
+对话和档案从 v0.4 起彼此独立：对话用 `J2MELLM_CHATS` 保存轻量元数据索引，每个对话使用 `J2C_<conversationId>` 保存逐消息 CRC 记录；切换档案只改变当前对话后续请求使用的提供商，不切换或清空消息。旧 `J2CHAT_<id>` 只用于一次性迁移，且不会删除。
 
 语言偏好单独保存在 `J2MELLM_UI_PREFS`，不会触发 profile、会话或 `.j2cfg` 迁移。切换语言后，`LlmMidlet` 重建依赖静态 LCDUI 文本的命令和界面，并把当前档案与会话重新绑定到 `ChatCanvas`。
 
@@ -132,36 +134,35 @@ Kimi 档案根据模型名识别 K3 与 K2.7 Code 常开思考模型；K2.5/K2.6
 
 打开多模态后：
 
-- `ImagePicker` 通过反射/可选 JSR-75 路径加载文件，目录最多显示 256 项，文件最大 96 KiB；
-- `ImageDimensions` 只读 PNG/GIF/JPEG/WebP 头，确认解码像素不超过 65,536 后才调用平台图片解码器；未知或超限返回图跳过预览；
+- `ImagePicker` 通过反射/可选 JSR-75 路径加载文件，目录最多显示 256 项；兼容档为 96 KiB / 65,536 像素，高性能档为 512 KiB / 1,048,576 像素；
+- `ImageDimensions` 只读 PNG/GIF/JPEG/WebP 头，确认解码像素不超过当前配置后才调用平台图片解码器；未知或超限返回图跳过预览；
 - 读已知大小文件前要求可用堆大致不低于 `3 × 文件大小 + 64 KiB`；
 - 捕获 `OutOfMemoryError` 并返回可理解的错误，避免让整个 MIDlet 无提示退出；
 - 请求图片写为 `image_url` data URL，Base64 流式编码，`detail=low`；
 - 请求结束立即释放图片原始 byte[]；
-- 兼容返回图片下载上限 256 KiB，且仍受 65,536 解码像素上限约束，预览按屏幕宽度缩放；
+- 返回图片兼容档下载上限 256 KiB，高性能档为 1 MiB，且仍受对应像素与可用堆检查约束，预览按屏幕宽度缩放；
 - RMS 不保存图片字节或 data URL，只保存受限元数据/远程来源。
 
 Chat Completions 的标准能力以 [OpenAI Create chat completion](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 为准；应用识别的图片输出字段属于兼容扩展。
 
 ## 7. 内存预算与峰值控制
 
-老 MIDP 手机的堆可能只有数 MiB，而且 `String`、`Image` 和厂商 HTTP 栈还会产生不可见副本。v0.2 采用多层上限，不依赖单一 OOM 捕获：
+老 MIDP 手机的堆可能只有数 MiB，而且 `String`、`Image` 和厂商 HTTP 栈还会产生不可见副本。v0.4 把限制分成兼容、推荐和显式解锁的自定义档，不依赖单一 OOM 捕获：
 
 | 对象/路径 | 上限或策略 |
 | --- | --- |
-| 单条消息正文 | 24,576 字符 |
-| 单条消息思考 | 8,192 字符 |
-| 活动会话 | 控制层按 49,152 字符、最多 32 条的双重预算回收最旧消息，保留最近对话 |
-| 一次请求历史 | 当前档案 `historyMessages`，规范化为 2–24 |
-| 每档案 RMS 历史 | 最近 24 条已完成消息 |
-| RMS 单条持久化正文/思考 | 5,000 / 1,500 字符 |
-| SSE 单行 | 64 KiB |
-| 非流式普通响应 | 256 KiB |
-| 非流式多模态响应 | 512 KiB |
+| 单条消息正文 | 推荐 49,152；自定义 8,192–262,144 字符 |
+| 单条消息思考 | 推荐 16,384；自定义 4,096–131,072 字符 |
+| 活动会话 | 推荐 131,072 字符、64 条；自定义最高 1,048,576 字符、256 条 |
+| 一次请求历史 | 同时受档案 `historyMessages` 和推荐 96,000 / 自定义字符预算约束 |
+| 每对话 RMS 历史 | 推荐最近 64 条；自定义 16–256 条已完成消息 |
+| RMS 单条持久化正文/思考 | UTF-8 32 位长度、逐消息 CRC；仍受自定义消息上限约束 |
+| SSE 单行 | 随正文、思考和返回图片配置增长，绝对上限 12 MiB |
+| 非流式响应 | 随正文、思考和返回图片配置增长，绝对上限 12 MiB |
 | HTTP 错误响应 | 32 KiB（模型目录错误 16 KiB） |
 | 模型目录 | 128 KiB、64 ID |
-| 本地发送图片 | 96 KiB、65,536 像素，加读前可用堆检查 |
-| 远程返回图片 | 256 KiB、65,536 解码像素 |
+| 本地发送图片 | 兼容 96 KiB / 65,536 像素；高性能 512 KiB / 1,048,576 像素 |
+| 远程返回图片 | 兼容 256 KiB；高性能 1 MiB；始终执行解码内存检查 |
 | `.j2cfg` / payload | 32 KiB / 24 KiB |
 
 “字符预算”不等于精确字节预算：Java `char`、对象头和 VM 实现会改变实际占用。它是确定性回收门槛，不是保证任何设备永不 OOM。真机验收仍需覆盖长中文、长英文、连续 SSE、小堆和图片组合。
@@ -189,7 +190,7 @@ CRC 只发现随机损坏，不抵抗恶意修改；RMS 也不加密。卸载 su
 
 ## 10. `.j2cfg` 边界
 
-外层是 UTF-8 JSON：格式名、版本、Base64 payload 和 payload CRC。payload 是第二个 UTF-8 JSON，承载档案字段。解析顺序刻意先执行便宜的大小与结构检查，再做解码和对象构造：
+外层是 UTF-8 JSON：格式名、版本、Base64 payload 和 payload CRC。payload 是第二个 UTF-8 JSON，承载档案字段，以及可选的全局搜索配置。解析顺序刻意先执行便宜的大小与结构检查，再做解码和对象构造：
 
 ```text
 file <= 32 KiB
@@ -201,9 +202,12 @@ file <= 32 KiB
  -> CRC-32 equality
  -> payload JSON
  -> <= 8 profiles + per-field bounds + unique IDs + active ID exists
- -> convert to ProfileState
- -> RMS save
+ -> optional search preset/endpoint/key/result-count bounds
+ -> convert to ProfileState and optional SearchConfig
+ -> compensating RMS saves
 ```
+
+搜索对象继续使用 `.j2cfg v2`，因为它是可选的向后兼容扩展：旧 v2 包缺少 `search` 时，导入器保留 `J2MELLM_SEARCH` 中的现有值；新包出现该对象时才校验并覆盖。导出始终携带当前搜索设置。若档案 RMS 已写入而搜索 RMS 写入失败，`LlmMidlet` 会尝试把旧档案写回，避免把失败的导入留成明显的半完成状态。
 
 `ProvisioningFileService` 是唯一直接依赖 `javax.microedition.io.file` 的配置模块；普通启动不实例化它。默认导出到 `FileSystemRegistry` 返回的第一个根目录，文件名 `J2ME-LLM-backup-<毫秒时间戳>.j2cfg`。写入先落到同目录临时文件并逐字节回读，随后改名；同名最终文件存在时拒绝，不截断旧备份。
 
@@ -258,8 +262,6 @@ v0.3 防护重点是意外损坏、峰值内存和误暴露，不包含完整安
 - [Oracle Java ME RMS RecordStore](https://docs.oracle.com/javame/config/cldc/ref-impl/midp2.0/jsr118/javax/microedition/rms/RecordStore.html)
 
 协议链接与预设说明按 2026-07-25 核对。
-
-
 
 
 

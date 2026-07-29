@@ -2,11 +2,25 @@
 
 **简体中文** | [English](README.en.md)
 
-J2ME LLM 是一个面向 CLDC 1.1 / MIDP 2.0 手机和 Java ME 模拟器的轻量 OpenAI Chat Completions 兼容客户端。当前发布版本为 v0.3.0，在 v0.2.0 的多档案、模型目录、思考控制、低内存请求和离线配置包基础上，加入中英双语界面与触屏全屏工具栏。
+J2ME LLM 是一个面向 CLDC 1.1 / MIDP 2.0 手机和 Java ME 模拟器的轻量 OpenAI Chat Completions 兼容客户端。当前版本为 v0.4.0，重点补齐多对话、消息编辑/重新生成、联网搜索和可解锁资源限制。
 
-**下载 v0.3.0：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM.jad) · [离线配置生成器 HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Config-Generator-v0.3.0.html) · [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.3.0/J2ME-LLM-Gateway-v0.3.0-windows-x64.zip) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.3.0)
+**下载 v0.4.0：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jad) · [离线配置生成器 HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Config-Generator-v0.4.0.html) · [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Gateway-v0.4.0-windows-x64.zip) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.4.0)
 
-> **项目说明：** v0.3.0 是当前公开版本，v0.2.0 是首个公开版本；v0.1.0 只是未公开的开发与 W995 实机验证版本。本项目由 Chihoko 提出产品方向并完成实机验证，通过 AI 辅助的 vibe coding 协作完成设计、实现、测试与文档。
+> **项目说明：** v0.4.0 已完成实机验证；v0.2.0 是首个公开版本，v0.1.0 是未公开的开发与 W995 实机验证版本。本项目由 Chihoko 提出产品方向并完成实机验证，通过 AI 辅助的 vibe coding 协作完成设计、实现、测试与文档。
+
+## v0.4.0 新增
+
+> **联网搜索仍是测试功能。** 搜索服务、结果质量和网络兼容性可能不稳定或不完善；免费无密钥模式仅作为不可用时的兜底。推荐使用 Brave、Tavily、Exa 等需要 API Key 的搜索服务，并优先通过随 Release 提供的离线配置生成器填写搜索设置、生成 `.j2cfg`，再导入手机端。
+
+- “对话 / 新建”可打开对话列表；列表第一行固定为“+ 新建对话”，其余对话可切换、重命名和删除。每个对话独立保存，切换模型档案不再替换当前历史。
+- “消息”可选择已发送的用户消息进行编辑并重新发送，也可从任意回答重新生成；后续旧分支会被移除。
+- 编辑器提供“搜索并发送”。搜索设置内置免费无密钥的 DuckDuckGo + Wikipedia、公共 SearXNG 参考预设，以及 Brave、Tavily、Exa、自定义 JSON API。
+- 搜索来源会被裁剪并随用户消息保存，以明确的非可信引用区块交给模型；免费公共服务只作为参考，不保证稳定性、覆盖率或隐私策略。
+- “资源限制”默认采用推荐档：131,072 个活动字符、64 条活动/保存消息、96,000 个请求上下文字符。兼容档保持旧机预算；自定义档允许用户显式解锁后探索设备边界。
+- 图片默认仍采用 96 KiB / 65,536 像素兼容档。高性能档面向 S60 高端机、Symbian^3 和高端索爱机，放宽到 512 KiB / 1,048,576 像素；自定义档可继续提高，但所有档位仍执行解码前内存检查。
+- 局域网网关增加 `/v1/search`，老 TLS 手机可把搜索预设设为“自定义 JSON API”，端点填写 `http://电脑IP:8787/v1/search?q={query}&count={count}`，API Key 填设备令牌。
+
+完整的范围、默认值、数据迁移和验收矩阵见 [v0.4 实施方案](docs/V0.4_IMPLEMENTATION_PLAN.md)。
 
 ## v0.3.0 新增
 
@@ -55,7 +69,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\build.ps1
 - `dist/J2ME-LLM.jar`
 - `dist/J2ME-LLM.jad`
 
-构建脚本运行 12 组桌面自测、ECJ Java 1.3 / class 1.1 编译和 Java ME 预验证。发布包不要使用 `-SkipTests`。
+构建脚本运行 16 组桌面自测、ECJ Java 1.3 / class 1.1 编译和 Java ME 预验证。发布包不要使用 `-SkipTests`。
 
 启动 MicroEmulator：
 
@@ -86,14 +100,15 @@ RMS 属于 MIDlet suite；覆盖是否被手机识别为同一 suite 仍取决�
 
 在安卓手机或电脑上直接打开 [provisioner/index.html](provisioner/index.html)。页面无网络依赖，不会上传表单：
 
-1. 填写四个档案并生成 `J2ME-LLM-config-v2.j2cfg`。
-2. 使用安卓系统分享，通过蓝牙发给 Java 手机。
-3. 在应用“档案 → 导入配置”中选择文件。
-4. 导入成功后可直接删除手机上的配置包，同时清理安卓下载目录和蓝牙收件箱副本。
+1. 填写一个或多个模型档案，并按需配置联网搜索预设、端点和搜索 API Key。
+2. 生成 `J2ME-LLM-config-v2.j2cfg`。
+3. 使用安卓系统分享，通过蓝牙发给 Java 手机。
+4. 在应用“档案 → 导入配置”中选择文件。
+5. 导入成功后可直接删除手机上的配置包，同时清理安卓下载目录和蓝牙收件箱副本。
 
 `.j2cfg` 使用版本化 JSON、Base64 payload 和 CRC-32。它能发现传输损坏，但**没有加密或来源认证**；API Key 仍是明文。建议导入可撤销、有限额的网关令牌，不要长期保存主账户密钥。格式和离线检查见 [生成器说明](provisioner/README.md)。
 
-导出入口为“档案 → 导出配置”，默认写入第一个可写文件系统根目录的 `J2ME-LLM-backup-<毫秒时间戳>.j2cfg`。导入/导出只包含档案配置，不包含聊天记录。
+导出入口为“档案 → 导出配置”，默认写入第一个可写文件系统根目录的 `J2ME-LLM-backup-<毫秒时间戳>.j2cfg`。v0.4 的导入/导出包含模型档案和搜索设置，不包含聊天记录；旧 v2 包未携带搜索对象时会保留手机现有搜索设置。
 
 ## 思考与思维链
 
@@ -108,7 +123,7 @@ RMS 属于 MIDlet suite；覆盖是否被手机识别为同一 suite 仍取决�
 
 ## 多模态与内存
 
-多模态默认关闭。开启后，有 JSR-75 的设备可选择不超过 96 KiB、且不超过 65,536 像素的 JPG、PNG、GIF 或 WebP；请求使用 `image_url` data URL 和 `detail: low`。返回图片属于兼容扩展，远程下载上限 256 KiB。
+多模态默认关闭。兼容图片档允许不超过 96 KiB、65,536 像素的 JPG、PNG、GIF 或 WebP；高性能档为 512 KiB、1,048,576 像素；自定义档的绝对上限为 4 MiB、4,194,304 像素。请求使用 `image_url` data URL 和 `detail: low`。返回图片兼容档上限 256 KiB，高性能档为 1 MiB。
 
 图片会显著增加堆占用。原始发送字节在请求写出后释放，旧预览会随会话预算回收；解码失败或内存不足只影响图片预览，不应阻止文字聊天。MIDP 解码器通常以 JPEG/PNG 最可靠。
 

@@ -161,7 +161,7 @@ public final class ProviderPresets {
         if (profile.systemPrompt == null) profile.systemPrompt = "";
         if (profile.reasoningEffort == null) profile.reasoningEffort = "";
         if (profile.historyMessages < 2) profile.historyMessages = 2;
-        if (profile.historyMessages > 24) profile.historyMessages = 24;
+        if (profile.historyMessages > 256) profile.historyMessages = 256;
         if (profile.thinkingMode < ProviderProfile.THINKING_AUTO
                 || profile.thinkingMode > ProviderProfile.THINKING_OFF) {
             profile.thinkingMode = ProviderProfile.THINKING_AUTO;
@@ -171,7 +171,6 @@ public final class ProviderPresets {
         }
     }
 }
-
 
 
 

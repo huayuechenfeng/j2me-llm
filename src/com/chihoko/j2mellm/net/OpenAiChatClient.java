@@ -2,6 +2,7 @@ package com.chihoko.j2mellm.net;
 
 import com.chihoko.j2mellm.model.ChatMessage;
 import com.chihoko.j2mellm.model.ProviderProfile;
+import com.chihoko.j2mellm.model.ResourceLimits;
 import com.chihoko.j2mellm.util.Json;
 import com.chihoko.j2mellm.util.Utf8;
 
@@ -17,6 +18,7 @@ import javax.microedition.io.HttpConnection;
 
 public final class OpenAiChatClient implements Runnable {
     private ProviderProfile config;
+    private ResourceLimits limits;
     private Vector messages;
     private ChatListener listener;
     private volatile boolean cancelled;
@@ -27,12 +29,15 @@ public final class OpenAiChatClient implements Runnable {
         return listener != null;
     }
 
-    public synchronized void send(ProviderProfile provider, Vector history, ChatListener callback) {
+    public synchronized void send(ProviderProfile provider, Vector history,
+            ResourceLimits resourceLimits, ChatListener callback) {
         if (listener != null) {
             callback.onError("已有请求正在进行");
             return;
         }
         config = provider;
+        limits = resourceLimits == null ? ResourceLimits.recommended() : resourceLimits.copy();
+        limits.normalize();
         messages = history;
         listener = callback;
         cancelled = false;
@@ -67,6 +72,7 @@ public final class OpenAiChatClient implements Runnable {
             synchronized (this) {
                 activeConnection = null;
                 config = null;
+                limits = null;
                 messages = null;
                 listener = null;
             }
@@ -112,7 +118,7 @@ public final class OpenAiChatClient implements Runnable {
                 throw new IOException("HTTP " + status + ": " + errorMessage(readAll(input, 32768)));
             }
             if (config.stream) readPossiblyStreaming(input);
-            else decodeComplete(readAll(input, config.multimodal ? 524288 : 262144));
+            else decodeComplete(readAll(input, responseByteLimit()));
         } finally {
             releaseRequestImages(messages);
             closeQuietly(input);
@@ -122,7 +128,8 @@ public final class OpenAiChatClient implements Runnable {
     }
 
     private void readPossiblyStreaming(InputStream input) throws IOException {
-        ByteLineReader reader = new ByteLineReader(input);
+        int responseLimit = responseByteLimit();
+        ByteLineReader reader = new ByteLineReader(input, responseLimit);
         ThinkingFilter filter = new ThinkingFilter(listener);
         String line;
         boolean sawSse = false;
@@ -136,7 +143,7 @@ public final class OpenAiChatClient implements Runnable {
                 if ("[DONE]".equals(data)) break;
                 decodeChunk(data, filter);
             } else if (!sawSse) {
-                if (plainJson.length() + line.length() > 262144) {
+                if (plainJson.length() + line.length() > responseLimit) {
                     throw new IOException("服务器响应超过内存安全限制");
                 }
                 plainJson.append(line);
@@ -309,6 +316,19 @@ public final class OpenAiChatClient implements Runnable {
             output.write(buffer, 0, count);
         }
         return Utf8.decode(output.toByteArray());
+    }
+
+    private int responseByteLimit() {
+        long text = ((long) limits.messageContentChars
+                + (long) limits.messageReasoningChars) * 4L + 65536L;
+        if (text < 262144L) text = 262144L;
+        if (config.multimodal) {
+            long image = ((long) limits.maximumReturnedImageBytes * 4L) / 3L
+                    + text + 65536L;
+            if (image > text) text = image;
+        }
+        if (text > 12582912L) text = 12582912L;
+        return (int) text;
     }
 
     private void throwIfCancelled() throws IOException {
