@@ -112,7 +112,7 @@ node .\gateway\self-test.js
 - 未授权聊天和模型请求返回 401；
 - 授权 GET /v1/models 的路径推导、上游 Authorization、状态与 Content-Type 转发；
 - POST /v1/chat/completions 的模型覆盖和 SSE 流式响应；
-- 三类请求的 J2ME-LLM-Gateway/0.4.0 User-Agent；
+- 三类请求的 J2ME-LLM-Gateway/0.4.1 User-Agent；
 - 授权搜索代理、查询参数转发和统一结果结构；
 - 生产配置拒绝 HTTP 上游，并拒绝无法推导的模型路径。
 

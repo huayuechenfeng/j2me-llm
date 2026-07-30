@@ -2,11 +2,16 @@
 
 [简体中文](README.md) | **English**
 
-J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. The current version is v0.4.0, adding multiple conversations, message edit/regenerate actions, web search, and unlockable resource limits.
+J2ME LLM is a lightweight OpenAI Chat Completions-compatible client for CLDC 1.1 / MIDP 2.0 phones and Java ME emulators. The current version is v0.4.1, with multiple conversations, message edit/regenerate actions, web search, unlockable resource limits, and smoother scrolling through very long messages.
 
-**Download v0.4.0:** [JAR installer](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jar) · [JAD descriptor](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jad) · [Offline configuration generator HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Config-Generator-v0.4.0.html) · [Standalone Windows x64 gateway ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Gateway-v0.4.0-windows-x64.zip) · [Release notes](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.4.0)
+**Download v0.4.1:** [JAR installer](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM.jar) · [JAD descriptor](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM.jad) · [Offline configuration generator HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM-Config-Generator-v0.4.1.html) · [Standalone Windows x64 gateway ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM-Gateway-v0.4.1-windows-x64.zip) · [Release notes](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.4.1)
 
-> **Project note:** v0.4.0 has completed real-device validation; v0.2.0 was the first public release, while v0.1.0 was an unpublished development and W995 device-testing prototype. Chihoko defined the product direction and performed real-device validation, while design, implementation, testing, and documentation were completed through AI-assisted vibe coding.
+> **Project note:** v0.4.1 has completed real-device validation; v0.2.0 was the first public release, while v0.1.0 was an unpublished development and W995 device-testing prototype. Chihoko defined the product direction and performed real-device validation, while design, implementation, testing, and documentation were completed through AI-assisted vibe coding.
+
+## What's new in v0.4.1
+
+- Improved scrolling performance for very long message bubbles: each repaint processes only text lines that intersect the visible clip instead of issuing draw calls for every off-screen line.
+- Line wrapping, bubble height, text layout, and appearance are unchanged; the improvement has been validated on a real device.
 
 ## What's new in v0.4.0
 

@@ -191,7 +191,7 @@ async function fetchSearch(config, query, count) {
   const url = expandSearchUrl(config.upstreamSearchUrl, query, count);
   const headers = {
     accept: 'application/json',
-    'user-agent': 'J2ME-LLM-Gateway/0.4.0',
+    'user-agent': 'J2ME-LLM-Gateway/0.4.1',
   };
   let method = 'GET';
   let body;
@@ -229,7 +229,7 @@ async function fetchSearch(config, query, count) {
     const wikiUrl = 'https://' + wikiHost + '/w/api.php?action=opensearch&search='
       + encodeURIComponent(query) + '&limit=' + count + '&namespace=0&format=json';
     const wiki = await readJsonResponse(await fetch(wikiUrl, {
-      headers: { accept: 'application/json', 'user-agent': 'J2ME-LLM-Gateway/0.4.0' },
+      headers: { accept: 'application/json', 'user-agent': 'J2ME-LLM-Gateway/0.4.1' },
       redirect: 'error',
     }));
     if (Array.isArray(wiki) && Array.isArray(wiki[1]) && Array.isArray(wiki[3])) {
@@ -314,7 +314,7 @@ function createGateway(input) {
           headers: {
             authorization: 'Bearer ' + config.upstreamApiKey,
             accept: 'application/json',
-            'user-agent': 'J2ME-LLM-Gateway/0.4.0',
+            'user-agent': 'J2ME-LLM-Gateway/0.4.1',
           },
           redirect: 'error',
         });
@@ -355,7 +355,7 @@ function createGateway(input) {
           authorization: 'Bearer ' + config.upstreamApiKey,
           'content-type': 'application/json; charset=utf-8',
           accept: request.headers.accept || 'text/event-stream, application/json',
-          'user-agent': 'J2ME-LLM-Gateway/0.4.0',
+          'user-agent': 'J2ME-LLM-Gateway/0.4.1',
         },
         body: JSON.stringify(body),
         redirect: 'error',

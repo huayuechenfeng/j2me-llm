@@ -167,7 +167,7 @@ async function main() {
       if (call.path !== '/search?q=hello&count=2') {
         assert.equal(call.authorization, 'Bearer upstream-secret');
       }
-      assert.equal(call.userAgent, 'J2ME-LLM-Gateway/0.4.0');
+      assert.equal(call.userAgent, 'J2ME-LLM-Gateway/0.4.1');
     }
 
     assert.throws(

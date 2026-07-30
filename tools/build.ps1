@@ -24,7 +24,7 @@ $finalJar = Join-Path $distRoot 'J2ME-LLM.jar'
 $finalJad = Join-Path $distRoot 'J2ME-LLM.jad'
 $manifest = Join-Path $projectRoot 'config\manifest.mf'
 $provisioner = Join-Path $projectRoot 'provisioner\index.html'
-$finalProvisioner = Join-Path $distRoot 'J2ME-LLM-Config-Generator-v0.4.0.html'
+$finalProvisioner = Join-Path $distRoot 'J2ME-LLM-Config-Generator-v0.4.1.html'
 
 foreach ($required in @($ecj, $cldc, $midp, $jsr75, $proguard, $manifest, $provisioner)) {
     if (-not (Test-Path -LiteralPath $required)) {
@@ -155,7 +155,7 @@ try {
     $jarSize = (Get-Item -LiteralPath $finalJar).Length
     $jadLines = @(
         'MIDlet-Name: J2ME LLM',
-        'MIDlet-Version: 0.4.0',
+        'MIDlet-Version: 0.4.1',
         'MIDlet-Vendor: Chihoko',
         'MIDlet-1: J2ME LLM,,com.chihoko.j2mellm.LlmMidlet',
         'Nokia-MIDlet-On-Screen-Keypad: no',

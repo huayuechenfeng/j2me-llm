@@ -274,7 +274,7 @@ node .\gateway\server.js
 
 ### 8.7 覆盖更新与恢复
 
-- [ ] 从实际 v0.1.0 / v0.2.0 / v0.3.0 包创建配置和历史，再覆盖安装 0.4.0。
+- [ ] 从实际 v0.1.0 / v0.2.0 / v0.3.0 / v0.4.0 包创建配置和历史，再覆盖安装 0.4.1。
 - [ ] 安装器明确识别更新，Name/Vendor/签名一致。
 - [ ] 旧配置和历史迁入“自定义（旧配置）”，其他档案保持默认。
 - [ ] 连续重启两次不会重复迁移。
@@ -313,7 +313,7 @@ node .\gateway\server.js
 
 ### 11.1 版本与描述符
 
-- [ ] `config/manifest.mf` 与生成 JAD 都是 `MIDlet-Version: 0.4.0`。
+- [ ] `config/manifest.mf` 与生成 JAD 都是 `MIDlet-Version: 0.4.1`。
 - [ ] Name/Vendor 与 v0.1 完全相同，大小写和空格也相同。
 - [ ] JAD 的 `MIDlet-Jar-Size` 等于最终 JAR 实际字节数。
 - [ ] 必需权限只有 HTTP/HTTPS；JSR-75 file read/write 为可选权限。
@@ -335,7 +335,7 @@ node .\gateway\server.js
 建议归档：
 
 ```text
-J2ME-LLM-0.4.0/
+J2ME-LLM-0.4.1/
   J2ME-LLM.jar
   J2ME-LLM.jad
   provisioner/index.html
@@ -367,7 +367,6 @@ CLDC/MIDP/JSR-75 能力：
 报告中必须删除 Authorization、`.j2cfg` payload、真实敏感提示词和可识别的私人图片。
 
 本文按 2026-07-25 的 v0.3 工具链与源码结构编写。
-
 
 
 

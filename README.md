@@ -2,11 +2,16 @@
 
 **简体中文** | [English](README.en.md)
 
-J2ME LLM 是一个面向 CLDC 1.1 / MIDP 2.0 手机和 Java ME 模拟器的轻量 OpenAI Chat Completions 兼容客户端。当前版本为 v0.4.0，重点补齐多对话、消息编辑/重新生成、联网搜索和可解锁资源限制。
+J2ME LLM 是一个面向 CLDC 1.1 / MIDP 2.0 手机和 Java ME 模拟器的轻量 OpenAI Chat Completions 兼容客户端。当前版本为 v0.4.1，包含多对话、消息编辑/重新生成、联网搜索、可解锁资源限制，以及更流畅的超长消息滚动。
 
-**下载 v0.4.0：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM.jad) · [离线配置生成器 HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Config-Generator-v0.4.0.html) · [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.0/J2ME-LLM-Gateway-v0.4.0-windows-x64.zip) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.4.0)
+**下载 v0.4.1：** [JAR 安装包](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM.jar) · [JAD 描述文件](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM.jad) · [离线配置生成器 HTML](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM-Config-Generator-v0.4.1.html) · [Windows x64 独立网关 ZIP](https://github.com/huayuechenfeng/j2me-llm/releases/download/v0.4.1/J2ME-LLM-Gateway-v0.4.1-windows-x64.zip) · [发布说明](https://github.com/huayuechenfeng/j2me-llm/releases/tag/v0.4.1)
 
-> **项目说明：** v0.4.0 已完成实机验证；v0.2.0 是首个公开版本，v0.1.0 是未公开的开发与 W995 实机验证版本。本项目由 Chihoko 提出产品方向并完成实机验证，通过 AI 辅助的 vibe coding 协作完成设计、实现、测试与文档。
+> **项目说明：** v0.4.1 已完成实机验证；v0.2.0 是首个公开版本，v0.1.0 是未公开的开发与 W995 实机验证版本。本项目由 Chihoko 提出产品方向并完成实机验证，通过 AI 辅助的 vibe coding 协作完成设计、实现、测试与文档。
+
+## v0.4.1 更新
+
+- 优化超长消息气泡的滚动性能：每次重绘只处理屏幕裁剪区内实际可见的文字行，不再为气泡内所有不可见行发出绘制调用。
+- 换行位置、气泡高度、文字布局和视觉效果保持不变；已完成实机流畅度验证。
 
 ## v0.4.0 新增
 

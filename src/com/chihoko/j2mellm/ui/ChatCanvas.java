@@ -434,14 +434,35 @@ public final class ChatCanvas extends Canvas {
     }
 
     private int drawLines(Graphics graphics, String text, LineMap lines, int x, int y, Font font) {
+        int lineHeight = font.getHeight();
+        int endY = y + lines.count * lineHeight;
+        int clipTop = graphics.getClipY();
+        int clipBottom = clipTop + graphics.getClipHeight();
+        int first = 0;
+        int last = lines.count;
+
+        // Some Java ME implementations still spend significant time on drawSubstring()
+        // calls that are completely outside the clip. Keep the full layout height, but
+        // issue drawing calls only for lines that can contribute pixels to this repaint.
+        if (clipTop > y) first = (clipTop - y) / lineHeight;
+        if (clipBottom <= y) last = 0;
+        else if (clipBottom < endY) {
+            last = (clipBottom - y + lineHeight - 1) / lineHeight;
+        }
+        if (first < 0) first = 0;
+        if (first > lines.count) first = lines.count;
+        if (last < first) last = first;
+        if (last > lines.count) last = lines.count;
+
+        y += first * lineHeight;
         int i;
-        for (i = 0; i < lines.count; i++) {
+        for (i = first; i < last; i++) {
             int length = lines.lengths[i];
             if (length > 0) graphics.drawSubstring(text, lines.starts[i], length, x, y,
                     Graphics.TOP | Graphics.LEFT);
-            y += font.getHeight();
+            y += lineHeight;
         }
-        return y;
+        return endY;
     }
 
     private void drawTouchToolbar(Graphics graphics, Font font, int width, int height,

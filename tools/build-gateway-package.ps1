@@ -3,7 +3,7 @@ Set-StrictMode -Version 2.0
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $nodeVersion = '24.14.0'
-$packageVersion = '0.4.0'
+$packageVersion = '0.4.1'
 $nodeArchiveName = 'node-v' + $nodeVersion + '-win-x64.zip'
 $downloadRoot = Join-Path $projectRoot '.tools\downloads'
 $nodeArchive = Join-Path $downloadRoot $nodeArchiveName
